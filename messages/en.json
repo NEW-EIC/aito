@@ -1,0 +1,901 @@
+{
+  "locale": "en",
+  "nav": {
+    "shows": "Shows",
+    "pricing": "Pricing",
+    "live": "Live",
+    "community": "Community",
+    "signin": "Sign in",
+    "cta": "Start 14-day trial"
+  },
+  "ticker": {
+    "live": "LIVE",
+    "closed": "CLOSED",
+    "session": "NY session",
+    "next": "HK open in"
+  },
+  "hero": {
+    "kicker": "Macro · Markets · Mandarin",
+    "headline": "Where Wall Street meets the Mandarin tape.",
+    "lede": "A two-way editorial desk for serious investors. Real-time macro pulse, deep-dive newsletters, and weekly live classes — bridging US markets and Greater China.",
+    "cta1": "Start 14-day trial",
+    "cta2": "Read a sample issue",
+    "trust": "Trusted by 12,000+ readers across NYC · SF · HK · Shanghai · Singapore"
+  },
+  "shows": {
+    "title": "Four desks. One signal.",
+    "sub": "Every product is written by the same editorial house. No syndication, no aggregation.",
+    "items": [
+      {
+        "tag": "DAILY",
+        "name": "Daily Pulse",
+        "desc": "07:00 ET. What moved overnight, what to watch into the cash open. 600 words.",
+        "cadence": "Mon–Fri",
+        "tier": "Premium"
+      },
+      {
+        "tag": "DEEP-DIVE",
+        "name": "The Long Read",
+        "desc": "Weekly thesis. One name, one macro question, or one policy read — argued at length.",
+        "cadence": "Thursday",
+        "tier": "Premium"
+      },
+      {
+        "tag": "CHINA",
+        "name": "China Tape",
+        "desc": "Caixin, 21st Century Business Herald, and the PBoC briefing — translated and contextualized.",
+        "cadence": "Mon · Wed · Fri",
+        "tier": "Pro Desk"
+      },
+      {
+        "tag": "LIVE",
+        "name": "Weekly Class",
+        "desc": "60-minute live session with the desk. Q&A, charts, the editor's notebook.",
+        "cadence": "Friday 10:00 ET",
+        "tier": "Pro Desk"
+      }
+    ]
+  },
+  "value": {
+    "title": "Why investors keep their seat.",
+    "items": [
+      {
+        "k": "01",
+        "t": "Two tapes, one desk.",
+        "d": "The same editors read the WSJ at 07:00 ET and the Caixin briefing at 20:00 HKT. You see the trade through both lenses, not one."
+      },
+      {
+        "k": "02",
+        "t": "Opinion, sourced.",
+        "d": "Every call is sourced and dated. We publish our misses with the same prominence as our hits. The methodology page is on the menu, not buried."
+      },
+      {
+        "k": "03",
+        "t": "Built for a portfolio, not a feed.",
+        "d": "No notifications. No streaks. No engagement bait. The product respects your time and your position size."
+      }
+    ]
+  },
+  "bridge": {
+    "eyebrow": "The trans-Pacific desk",
+    "title": "07:00 New York. 20:00 Hong Kong. Same desk.",
+    "sub": "Two reading shifts a day across one editorial team. Cross-checked, cross-cited, never re-translated from English wire copy.",
+    "ny": [
+      "NYC desk",
+      "Macro · rates · single names"
+    ],
+    "hk": [
+      "HK desk",
+      "Caixin · PBoC · A-shares · HK listings"
+    ]
+  },
+  "cta": {
+    "title": "Read tomorrow morning before the cash open.",
+    "sub": "One email, six minutes, before the bell. Free tier ships every Friday.",
+    "placeholder": "you@firm.com",
+    "btn": "Subscribe",
+    "done": "✓ Subscribed",
+    "fine": "Free tier. No credit card. Unsubscribe in one click."
+  },
+  "featured": {
+    "title": "As read by editors at",
+    "outlets": [
+      "Bloomberg",
+      "Caixin",
+      "Financial Times",
+      "Nikkei Asia",
+      "Stratechery",
+      "South China Morning Post"
+    ]
+  },
+  "pricing": {
+    "title": "Three tiers. No upsells.",
+    "sub": "Choose your seat at the desk. Annual saves two months.",
+    "monthly": "Monthly",
+    "annual": "Annual",
+    "save": "Save 17%",
+    "perMo": "/mo",
+    "billed": "billed annually",
+    "tiers": [
+      {
+        "name": "Reader",
+        "price": "$0",
+        "tagline": "The Friday brief, free for life.",
+        "cta": "Subscribe free",
+        "features": [
+          "Weekly free brief (Friday)",
+          "Public archive (90 days)",
+          "Comments on free issues",
+          "Three live-class previews per year"
+        ]
+      },
+      {
+        "name": "Premium",
+        "price": "$24",
+        "tagline": "The daily pulse and the long read.",
+        "cta": "Start 14-day trial",
+        "popular": true,
+        "features": [
+          "Daily Pulse (Mon–Fri, 07:00 ET)",
+          "The Long Read (Thursday deep-dive)",
+          "Full archive (since 2024)",
+          "Member IM: #macro-pulse · #single-names",
+          "Live-class recordings (48-hour window)"
+        ]
+      },
+      {
+        "name": "Pro Desk",
+        "price": "$84",
+        "tagline": "Plus China Tape, live, and the editor's notebook.",
+        "cta": "Start 14-day trial",
+        "features": [
+          "Everything in Premium",
+          "China Tape (Mon · Wed · Fri)",
+          "Weekly Live Class + persistent recording",
+          "IM: #china-tape · #study-group",
+          "Monthly AMA with the editorial desk",
+          "Editor's notebook (raw working file)"
+        ]
+      }
+    ],
+    "compare": {
+      "title": "Feature by feature.",
+      "rows": [
+        [
+          "Daily Pulse",
+          false,
+          true,
+          true
+        ],
+        [
+          "The Long Read (weekly)",
+          false,
+          true,
+          true
+        ],
+        [
+          "China Tape (3×/week)",
+          false,
+          false,
+          true
+        ],
+        [
+          "Full archive",
+          "90 days",
+          "since 2024",
+          "since 2024"
+        ],
+        [
+          "Member IM channels",
+          "—",
+          "2 channels",
+          "4 channels"
+        ],
+        [
+          "Weekly live class",
+          "preview",
+          "recording",
+          "live + recording"
+        ],
+        [
+          "Monthly AMA",
+          "—",
+          "—",
+          true
+        ],
+        [
+          "Editor's notebook",
+          "—",
+          "—",
+          true
+        ],
+        [
+          "Cancel anytime",
+          true,
+          true,
+          true
+        ]
+      ],
+      "cols": [
+        "Reader",
+        "Premium",
+        "Pro Desk"
+      ]
+    },
+    "faq": {
+      "title": "Quietly asked.",
+      "items": [
+        {
+          "q": "Do you give specific stock recommendations?",
+          "a": "Rarely, and only with a dated thesis, a stop, and a disclosure. Most of our work is framing — what to look at, why, and what would change our mind."
+        },
+        {
+          "q": "Is the Mandarin coverage translated from English?",
+          "a": "No. The China Tape is written from Mandarin primary sources by editors who read the Caixin briefing in the language it was published."
+        },
+        {
+          "q": "Can I expense this?",
+          "a": "Yes — Pro Desk invoices include a description suitable for a research-budget line item. Email accounting@aito.io for a custom PO."
+        },
+        {
+          "q": "What's your refund policy?",
+          "a": "14-day trial on all paid tiers. After that, prorated refund any time in the first 30 days, no questions."
+        }
+      ]
+    },
+    "fine": "Prices in USD. Annual subscribers save two months. Cancel from your dashboard. No automatic upgrades."
+  },
+  "article": {
+    "kicker": "Daily Pulse · Members only · May 14, 2026",
+    "title": "The yield curve un-inverted. Now what?",
+    "lede": "The 2s/10s spread closed positive for a third consecutive session — the cleanest signal we've had since August 2022. The reflex is to call it a recession all-clear. It is not.",
+    "byline": {
+      "author": "Selina Wang",
+      "role": "Editor, Macro Desk",
+      "read": "6 min read"
+    },
+    "body": [
+      {
+        "type": "p",
+        "text": "The standard playbook says a steepener after a long inversion is the bell for a recession that has already arrived. The cleaner reading — and the one we've been running on the desk since March — is that the bull steepener of the past two weeks is policy-driven, not growth-driven. The front end is moving on a Fed that finally has cover; the long end is sitting where it was in February."
+      },
+      {
+        "type": "h2",
+        "text": "Three signals we are watching"
+      },
+      {
+        "type": "p",
+        "text": "First, IG credit spreads. The OAS on the LQD basket has widened 14bps off the early-April tights, but is still 38bps below its 5-year average. Real money is not behaving like the curve. That tension resolves one of two ways and historically the spread market gets the answer first."
+      },
+      {
+        "type": "p",
+        "text": "Second, the dollar. DXY is range-bound between 102 and 104, and the cross-asset volatility in CNY has fallen to a 14-month low. A clean steepener with a soft dollar is the policy-driven outcome. A steepener with a strong dollar would mean something else, and we are not seeing it."
+      },
+      {
+        "type": "chart",
+        "caption": "2s10s spread, Jan 2024 → May 2026 (bps)"
+      }
+    ]
+  },
+  "paywall": {
+    "eyebrow": "Premium · 4 of 12 paragraphs visible",
+    "title": "Keep reading at the desk.",
+    "sub": "The rest of this piece — and the daily issue every weekday morning — is for Premium members.",
+    "cta": "Start 14-day trial",
+    "sub2": "Already a member?",
+    "signin": "Sign in",
+    "fine": "No card required for the trial. Cancel in one click."
+  },
+  "live": {
+    "title": "The live desk.",
+    "sub": "One 60-minute live session every Friday at 10:00 ET. The recording stays in your library. The transcript is searchable.",
+    "filter": {
+      "all": "All upcoming",
+      "premium": "Premium",
+      "pro": "Pro Desk only"
+    },
+    "addCal": "Add to calendar",
+    "gcal": "Google Calendar",
+    "ical": "Apple / .ics",
+    "outlook": "Outlook",
+    "hostedBy": "Hosted by",
+    "duration": "60 min",
+    "capacity": "Live + recording",
+    "preview": "Watch the trailer",
+    "classes": [
+      {
+        "date": "Fri · May 22",
+        "time": "10:00 ET / 22:00 HKT",
+        "title": "Trading the Mainland China reopening.",
+        "desc": "Where the consumption print is real, where it is statistical, and the three names we think have already priced it.",
+        "host": "Selina Wang",
+        "role": "Editor, Macro Desk",
+        "tier": "Pro Desk",
+        "seats": 142
+      },
+      {
+        "date": "Fri · May 29",
+        "time": "10:00 ET / 22:00 HKT",
+        "title": "How AI capex is reshaping the cap table.",
+        "desc": "A read on hyperscaler capex through the lens of the equity issuance calendar, with a side-by-side of the three names funding it through preferred.",
+        "host": "Bryan Lee",
+        "role": "Editor, Equities · ex-Bridgewater",
+        "tier": "Premium",
+        "seats": 318
+      },
+      {
+        "date": "Fri · Jun 05",
+        "time": "10:00 ET / 22:00 HKT",
+        "title": "Macro hedges for a Q3 risk-off.",
+        "desc": "What we're carrying into the back half: a curve trade, a vol trade, and the one currency pair the desk argues is still mispriced.",
+        "host": "Mei Zhao",
+        "role": "Editor, FX · ex-Sequoia China",
+        "tier": "Pro Desk",
+        "seats": 96
+      },
+      {
+        "date": "Fri · Jun 12",
+        "time": "10:00 ET / 22:00 HKT",
+        "title": "Reading the Caixin tape.",
+        "desc": "A live working session — the China Tape desk walks through three days of Caixin briefings and what we filed in response.",
+        "host": "Chris Pan",
+        "role": "Editor in Chief",
+        "tier": "Pro Desk",
+        "seats": 64
+      }
+    ],
+    "archive": {
+      "title": "Recently in the library",
+      "note": "Last six weeks. Pro Desk has full archive."
+    }
+  },
+  "footer": {
+    "tagline": "The trans-Pacific signal desk.",
+    "cols": [
+      {
+        "h": "Product",
+        "items": [
+          "Daily Pulse",
+          "The Long Read",
+          "China Tape",
+          "Live class",
+          "Podcast"
+        ]
+      },
+      {
+        "h": "Company",
+        "items": [
+          "About",
+          "Methodology",
+          "Conflicts policy",
+          "Careers",
+          "Contact"
+        ]
+      },
+      {
+        "h": "Legal",
+        "items": [
+          "Terms",
+          "Privacy",
+          "Compliance",
+          "Refund policy"
+        ]
+      }
+    ],
+    "fine": "© 2026 AITO Editorial Ltd · 香港中環 · Investment advice for general informational purposes only. Not a registered investment adviser."
+  },
+  "nav2": {
+    "podcast": "Podcast",
+    "newsletter": "Archive",
+    "dashboard": "Dashboard",
+    "about": "About",
+    "trial": "Start trial"
+  },
+  "community": {
+    "eyebrow": "Members only",
+    "title": "Where the desk meets the floor.",
+    "sub": "Bilingual chat, weekly AMAs, and a slow-mode Discourse forum for serious discussion. Moderated by the editorial team, not a community manager.",
+    "mod": "All channels are bilingual (EN/中文). Moderation is done by the desk editors themselves, not outsourced. Two-strike policy on tickers without a thesis.",
+    "channels": [
+      {
+        "name": "#macro-pulse",
+        "desc": "Real-time talk on rates, FX, and the daily pulse calls.",
+        "members": 4218,
+        "active": 142,
+        "tier": "Premium",
+        "flag": "Live now"
+      },
+      {
+        "name": "#china-tape",
+        "desc": "Caixin briefings, A-shares, HK listings, PBoC reads.",
+        "members": 1872,
+        "active": 64,
+        "tier": "Pro Desk",
+        "flag": "Live now"
+      },
+      {
+        "name": "#single-names",
+        "desc": "Bottom-up: catalysts, filings, the long-read follow-ups.",
+        "members": 2904,
+        "active": 213,
+        "tier": "Premium",
+        "flag": ""
+      },
+      {
+        "name": "#study-group",
+        "desc": "Slower thread for first-principles questions and reading lists.",
+        "members": 1106,
+        "active": 48,
+        "tier": "Pro Desk",
+        "flag": ""
+      }
+    ],
+    "topicsTitle": "Recently on the forum",
+    "topics": [
+      {
+        "cat": "Macro",
+        "title": "Is the bull steepener already in the credit market?",
+        "replies": 38,
+        "time": "2h",
+        "author": "S. Wang"
+      },
+      {
+        "cat": "China",
+        "title": "Reading the May LPR fix — what changed in the footnote.",
+        "replies": 22,
+        "time": "4h",
+        "author": "C. Pan"
+      },
+      {
+        "cat": "Equities",
+        "title": "AI capex through the preferred stack — naming three.",
+        "replies": 47,
+        "time": "7h",
+        "author": "B. Lee"
+      },
+      {
+        "cat": "FX",
+        "title": "USD/CNH range trade — where does the desk sit?",
+        "replies": 19,
+        "time": "11h",
+        "author": "M. Zhao"
+      },
+      {
+        "cat": "Methodology",
+        "title": "How do we decide when a thesis is wrong?",
+        "replies": 64,
+        "time": "1d",
+        "author": "Editorial"
+      }
+    ],
+    "ama": {
+      "tag": "Upcoming AMA",
+      "title": "Ask the desk: the back half.",
+      "date": "Thu · May 22 · 11:00 ET",
+      "who": "Whole editorial team. 90 minutes.",
+      "cta": "RSVP"
+    }
+  },
+  "podcast": {
+    "eyebrow": "Podcast · S2 · Episode 14",
+    "title": "The yield curve is positive. Don't celebrate yet.",
+    "lede": "A conversation between Selina Wang and Chris Pan on what the un-inversion means, what credit is saying, and how the desk is positioned into Q3.",
+    "duration": "42:18",
+    "published": "Published May 14, 2026",
+    "hostsLabel": "With",
+    "hosts": [
+      {
+        "name": "Selina Wang",
+        "role": "Editor, Macro Desk"
+      },
+      {
+        "name": "Chris Pan",
+        "role": "Editor in Chief"
+      }
+    ],
+    "chapters": [
+      {
+        "t": "00:00",
+        "title": "Why we're not calling all-clear"
+      },
+      {
+        "t": "08:14",
+        "title": "The credit signal — and what would change our mind"
+      },
+      {
+        "t": "17:02",
+        "title": "Reading the dollar / CNH range"
+      },
+      {
+        "t": "26:40",
+        "title": "Three positions we're carrying into Q3"
+      },
+      {
+        "t": "35:28",
+        "title": "Listener question — small-cap dispersion"
+      }
+    ],
+    "transcript": {
+      "title": "Transcript preview",
+      "sub": "First five minutes. Full transcript and search for Pro Desk members.",
+      "lines": [
+        {
+          "who": "Selina Wang",
+          "t": "00:00",
+          "text": "Welcome back. We're recording on the morning of May 14, the 2s/10s spread closed positive for the third session, and the question on the desk this morning is the same question that's in every chat in the open finance world: is it over."
+        },
+        {
+          "who": "Chris Pan",
+          "t": "00:24",
+          "text": "It's not over. And the reason it's not over is the same reason we've been talking about it for six weeks — the steepener is policy-driven, the long end isn't moving, and credit spreads are not behaving like the curve."
+        },
+        {
+          "who": "Selina Wang",
+          "t": "00:48",
+          "text": "Let me push back on that for a second. We had a strong CPI print, the Fed dot plot drifted, the front end ripped — that's a real steepener. Why is that different from a 1995 cycle steepener?"
+        },
+        {
+          "who": "Chris Pan",
+          "t": "01:14",
+          "text": "Two reasons. One: in 1995 you also had the long end coming in — soft landing, term premium compression, the whole thing. This time the long end is essentially where it was in February. Two: the dollar."
+        }
+      ],
+      "more": "Continue reading transcript"
+    },
+    "related": [
+      {
+        "ep": "S2 · E13",
+        "title": "What the May LPR fix actually changed.",
+        "date": "May 7",
+        "duration": "38:02"
+      },
+      {
+        "ep": "S2 · E12",
+        "title": "AI capex through the cap table — a sit-down with Bryan Lee.",
+        "date": "Apr 30",
+        "duration": "51:44"
+      },
+      {
+        "ep": "S2 · E11",
+        "title": "A 12,000-foot read on the Q2 earnings calendar.",
+        "date": "Apr 23",
+        "duration": "33:51"
+      }
+    ]
+  },
+  "newsletter": {
+    "title": "The archive.",
+    "sub": "Every issue since launch. Free issues open to anyone. Premium issues need a member seat.",
+    "search": "Search the archive",
+    "filters": {
+      "all": "All",
+      "free": "Free",
+      "premium": "Premium",
+      "pro": "Pro Desk",
+      "tags": [
+        "Macro",
+        "China",
+        "Equities",
+        "FX",
+        "Methodology"
+      ]
+    },
+    "colDate": "Date",
+    "colTitle": "Issue",
+    "colKicker": "Show",
+    "colTier": "Tier",
+    "colRead": "Read",
+    "rows": [
+      {
+        "date": "May 14",
+        "kicker": "Daily Pulse",
+        "title": "The yield curve un-inverted. Now what?",
+        "tier": "Premium",
+        "read": "6 min",
+        "tags": [
+          "Macro"
+        ]
+      },
+      {
+        "date": "May 13",
+        "kicker": "China Tape",
+        "title": "The PBoC quietly bought duration. Read the footnote.",
+        "tier": "Pro Desk",
+        "read": "8 min",
+        "tags": [
+          "China"
+        ]
+      },
+      {
+        "date": "May 10",
+        "kicker": "Friday Free",
+        "title": "What we got wrong in April — a public ledger.",
+        "tier": "Free",
+        "read": "9 min",
+        "tags": [
+          "Methodology"
+        ]
+      },
+      {
+        "date": "May 09",
+        "kicker": "The Long Read",
+        "title": "A capital-light way to short the China consumer reopening.",
+        "tier": "Premium",
+        "read": "14 min",
+        "tags": [
+          "China",
+          "Equities"
+        ]
+      },
+      {
+        "date": "May 08",
+        "kicker": "Daily Pulse",
+        "title": "The CPI print was hot. The dot plot is the trade.",
+        "tier": "Premium",
+        "read": "5 min",
+        "tags": [
+          "Macro"
+        ]
+      },
+      {
+        "date": "May 06",
+        "kicker": "China Tape",
+        "title": "Reading the May LPR fix — what changed in the footnote.",
+        "tier": "Pro Desk",
+        "read": "7 min",
+        "tags": [
+          "China"
+        ]
+      },
+      {
+        "date": "May 03",
+        "kicker": "Friday Free",
+        "title": "On editorial COI — how the desk handles single-name calls.",
+        "tier": "Free",
+        "read": "8 min",
+        "tags": [
+          "Methodology"
+        ]
+      },
+      {
+        "date": "May 02",
+        "kicker": "The Long Read",
+        "title": "AI capex through the preferred stack — naming three.",
+        "tier": "Premium",
+        "read": "16 min",
+        "tags": [
+          "Equities"
+        ]
+      },
+      {
+        "date": "Apr 30",
+        "kicker": "Daily Pulse",
+        "title": "The dollar / CNH range. Three trades.",
+        "tier": "Premium",
+        "read": "6 min",
+        "tags": [
+          "FX"
+        ]
+      },
+      {
+        "date": "Apr 29",
+        "kicker": "China Tape",
+        "title": "21st Century Business Herald on the property pivot.",
+        "tier": "Pro Desk",
+        "read": "9 min",
+        "tags": [
+          "China"
+        ]
+      },
+      {
+        "date": "Apr 26",
+        "kicker": "Friday Free",
+        "title": "A reading list for first-principles macro.",
+        "tier": "Free",
+        "read": "4 min",
+        "tags": [
+          "Methodology"
+        ]
+      },
+      {
+        "date": "Apr 25",
+        "kicker": "The Long Read",
+        "title": "Why we think the small-cap dispersion trade has legs.",
+        "tier": "Premium",
+        "read": "13 min",
+        "tags": [
+          "Equities"
+        ]
+      }
+    ],
+    "pagination": "Page 1 of 34 · 412 issues"
+  },
+  "dashboard": {
+    "greeting": "Good morning,",
+    "reader": "Selina K.",
+    "nav": [
+      "Overview",
+      "Reading",
+      "Notifications",
+      "Billing",
+      "Account"
+    ],
+    "sub": {
+      "title": "Subscription",
+      "plan": "Pro Desk",
+      "status": "Active",
+      "renew": "Renews May 30, 2026",
+      "price": "$84/month",
+      "method": "Visa · 4242",
+      "cta": "Manage plan",
+      "secondary": "Switch to annual · save $168"
+    },
+    "read": {
+      "title": "Recently read",
+      "sub": "Last 10 issues you opened.",
+      "rows": [
+        {
+          "date": "May 14",
+          "title": "The yield curve un-inverted. Now what?",
+          "show": "Daily Pulse",
+          "pct": 100
+        },
+        {
+          "date": "May 13",
+          "title": "The PBoC quietly bought duration. Read the footnote.",
+          "show": "China Tape",
+          "pct": 64
+        },
+        {
+          "date": "May 09",
+          "title": "A capital-light way to short the China consumer reopening.",
+          "show": "The Long Read",
+          "pct": 100
+        },
+        {
+          "date": "May 08",
+          "title": "The CPI print was hot. The dot plot is the trade.",
+          "show": "Daily Pulse",
+          "pct": 100
+        },
+        {
+          "date": "May 06",
+          "title": "Reading the May LPR fix — what changed in the footnote.",
+          "show": "China Tape",
+          "pct": 38
+        }
+      ],
+      "emptyHint": "Saved for later"
+    },
+    "notif": {
+      "title": "Notifications",
+      "sub": "Where each kind of message reaches you. Off everywhere means quiet.",
+      "kinds": [
+        "Daily Pulse (07:00 ET)",
+        "The Long Read (Thursday)",
+        "China Tape",
+        "Live class reminder (24h)",
+        "Live class reminder (1h)",
+        "AMA replies",
+        "Forum mentions"
+      ],
+      "channels": [
+        "Email",
+        "Push",
+        "IM"
+      ],
+      "saveNote": "Changes save automatically."
+    },
+    "bill": {
+      "title": "Billing",
+      "next": "Next invoice",
+      "nextAmount": "$84.00",
+      "nextDate": "Jun 14, 2026",
+      "method": "Payment method",
+      "update": "Update card",
+      "history": "Recent invoices",
+      "invoices": [
+        {
+          "id": "INV-2026-05",
+          "date": "May 14, 2026",
+          "amount": "$84.00",
+          "status": "Paid"
+        },
+        {
+          "id": "INV-2026-04",
+          "date": "Apr 14, 2026",
+          "amount": "$84.00",
+          "status": "Paid"
+        },
+        {
+          "id": "INV-2026-03",
+          "date": "Mar 14, 2026",
+          "amount": "$84.00",
+          "status": "Paid"
+        },
+        {
+          "id": "INV-2026-02",
+          "date": "Feb 14, 2026",
+          "amount": "$84.00",
+          "status": "Paid"
+        }
+      ],
+      "receipt": "Download receipt"
+    }
+  },
+  "signup": {
+    "eyebrow": "14-day free trial",
+    "title": "Sit at the desk for two weeks. No card required.",
+    "sub": "We send the daily issue every weekday morning before the cash open. Cancel anytime from your dashboard.",
+    "email": "Email",
+    "emailPh": "you@firm.com",
+    "plan": "Choose a plan",
+    "planNote": "Trial is free for 14 days on either plan.",
+    "terms": "I accept the ",
+    "termsLink": "Terms",
+    "and": " and ",
+    "privacy": "Privacy Policy",
+    "version": "v3 · effective Apr 14, 2026",
+    "cta": "Start free trial",
+    "after": "After trial",
+    "after2": "Pro Desk billed at $84/month. Premium at $24/month. Annual saves two months on either.",
+    "proof": "12,400+ subscribers across NYC · SF · HK · Shanghai · Singapore",
+    "sideTitle": "What ships, immediately:",
+    "side": [
+      "Tomorrow's Daily Pulse — in your inbox at 07:00 ET",
+      "Full archive — 412 issues since 2024",
+      "Access to #macro-pulse and #single-names",
+      "Live-class recording (Pro Desk: live + recording)"
+    ],
+    "logos": [
+      "NYC · SF · HK · Shanghai · Singapore"
+    ]
+  },
+  "about": {
+    "eyebrow": "About",
+    "title": "A small editorial house, run by people who read both tapes.",
+    "lede": "We are not a guru, not a day-trading service, not an aggregator. We are five editors and a producer who think the next decade of investing requires reading two markets in two languages, with the same standards.",
+    "teamTitle": "The desk",
+    "team": [
+      {
+        "name": "Chris Pan",
+        "role": "Editor in Chief",
+        "bio": "Twenty years between an FX desk in Hong Kong and the editorial team at a US wire. Reads the Caixin briefing in the language it was published.",
+        "flag": "Founder"
+      },
+      {
+        "name": "Selina Wang",
+        "role": "Editor, Macro Desk",
+        "bio": "Rates and macro. Previously buy-side macro PM. Writes the Daily Pulse most mornings.",
+        "flag": ""
+      },
+      {
+        "name": "Bryan Lee",
+        "role": "Editor, Equities",
+        "bio": "Single names and capital structure. Ex-Bridgewater. Writes the long read every other Thursday.",
+        "flag": ""
+      },
+      {
+        "name": "Mei Zhao",
+        "role": "Editor, FX",
+        "bio": "Currencies and EM. Ex-Sequoia China. Writes the China Tape three days a week.",
+        "flag": ""
+      }
+    ],
+    "methodTitle": "Methodology",
+    "method": [
+      "Every dated call carries a source, a date, and the criteria that would change our mind. We publish our misses with the same prominence as our hits.",
+      "We do not take advertising or sponsorship. We do not run hidden affiliate links. Subscription revenue is our only revenue.",
+      "We do not publish before 07:00 ET on issue days — period. No 'breaking' email at 02:00 to be first to wrong."
+    ],
+    "coiTitle": "Conflicts of interest",
+    "coi": [
+      "Editors disclose personal holdings on any single-name call, dated to the issue.",
+      "Editors do not trade the names they cover on the day of publication, or the day after.",
+      "The full COI policy lives on the methodology page. [CTO TO PROVIDE final wording before launch.]"
+    ],
+    "bridgeTitle": "Why a Pacific bridge.",
+    "bridge": "We think the next decade of investing requires reading two markets in two languages, with the same standards. There is a credible English-language press for US markets. There is a credible Mandarin-language press for Greater China. There is no editorial house yet writing both, by the same editors, for serious readers. We're building that.",
+    "contact": "Press, hiring, and partnerships: hello@aito.io"
+  }
+}

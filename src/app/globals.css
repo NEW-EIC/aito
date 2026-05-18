@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   Design tokens — light + dark
+   Ported from Claude Design's standalone HTML prototype.
+   ============================================================================ */
+:root {
+  /* Semantic surfaces — Bloomberg.com / Seeking Alpha aesthetic */
+  --bg: 255 255 255;             /* page canvas */
+  --bg-alt: 244 245 247;          /* alt section bg */
+  --surface: 255 255 255;         /* card */
+  --surface-sunk: 248 249 251;    /* below-surface */
+  --fg: 11 18 32;                 /* AITO logo navy */
+  --fg-muted: 75 85 99;
+  --fg-soft: 107 114 128;
+  --border: 229 231 235;
+  --border-strong: 209 213 219;
+  --rule: 238 240 243;
+  --accent-sem: 29 78 216;
+  --pulse-up: 4 120 87;
+  --pulse-down: 185 28 28;
+
+  /* Shadows — used by Tailwind shadow-soft / shadow-md */
+  --shadow-soft: 0 1px 0 rgba(15,23,42,0.04), 0 12px 24px -16px rgba(15,23,42,0.10);
+  --shadow-md: 0 2px 0 rgba(15,23,42,0.04), 0 24px 48px -20px rgba(15,23,42,0.15);
+}
+
+html[data-theme="dark"] {
+  --bg: 7 9 15;                   /* deepest layer */
+  --bg-alt: 12 16 24;             /* alt sections */
+  --surface: 19 26 38;            /* cards lift visibly */
+  --surface-sunk: 10 13 20;
+  --fg: 234 237 243;              /* off-white, not harsh */
+  --fg-muted: 154 161 174;
+  --fg-soft: 106 112 125;
+  --border: 31 37 51;
+  --border-strong: 44 51 70;
+  --rule: 22 28 40;
+  --accent-sem: 91 141 239;       /* desaturated professional blue */
+  --pulse-up: 63 213 151;
+  --pulse-down: 255 107 107;
+
+  --shadow-soft: 0 1px 0 rgba(0,0,0,0.5), 0 12px 24px -16px rgba(0,0,0,0.7);
+  --shadow-md: 0 1px 0 rgba(0,0,0,0.5), 0 30px 60px -28px rgba(0,0,0,0.85);
+}
+
+html, body { height: 100%; }
+
+html, body {
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+body {
+  font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+  font-variant-numeric: tabular-nums;
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* CJK type tweaks for zh-CN / zh-HK */
+html[lang^="zh"] body { line-height: 1.75; }
+[lang^="zh"] { letter-spacing: 0; }
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-pill text-sm font-medium transition-all px-4 h-10 disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-fg text-bg hover:opacity-90;
+  }
+  .btn-secondary {
+    @apply btn bg-surface-sunk text-fg border border-border hover:bg-bg-alt;
+  }
+  .btn-ghost {
+    @apply btn text-fg-muted hover:bg-bg-alt;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-pill px-2.5 py-0.5 text-xs font-medium;
+  }
+  .card {
+    @apply rounded-card border border-border bg-surface;
+  }
+  .heading-1 {
+    font-family: theme('fontFamily.display');
+    font-weight: 700;
+    font-size: clamp(2.2rem, 4.6vw, 3.9rem);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    @apply text-fg;
+    text-wrap: balance;
+  }
+  .heading-2 {
+    font-family: theme('fontFamily.display');
+    font-weight: 700;
+    font-size: clamp(1.6rem, 2.4vw, 2.2rem);
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    @apply text-fg;
+    text-wrap: balance;
+  }
+  .heading-3 {
+    font-family: theme('fontFamily.display');
+    font-weight: 600;
+    font-size: 1.4rem;
+    letter-spacing: -0.02em;
+    @apply text-fg;
+  }
+  .lead {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    max-width: 60ch;
+    text-wrap: pretty;
+    @apply text-fg-muted;
+  }
+  html[lang^="zh"] .lead { line-height: 1.75; }
+  html[lang^="zh"] .heading-1,
+  html[lang^="zh"] .heading-2 { letter-spacing: -0.005em; line-height: 1.2; }
+  .grid-bg {
+    background-image: radial-gradient(circle at 1px 1px, rgb(var(--fg) / 0.07) 1px, transparent 0);
+    background-size: 32px 32px;
+  }
+  .tabular-nums-feature {
+    font-feature-settings: "tnum";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

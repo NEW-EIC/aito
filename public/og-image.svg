@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <rect width="1200" height="630" fill="#0B1220"/>
+  <!-- subtle grid background -->
+  <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+    <circle cx="1" cy="1" r="1" fill="#FFFFFF" opacity="0.06"/>
+  </pattern>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <!-- gold accent bar -->
+  <rect x="0" y="0" width="6" height="630" fill="#F0B23A"/>
+  <!-- logo mark -->
+  <g transform="translate(80, 80)">
+    <rect width="56" height="56" rx="6" fill="#F8F6F1"/>
+    <path d="M16 38 L23.6 16 L32.4 16 L40 38 M19.5 31 L36.5 31"
+          stroke="#0B1220" stroke-width="3.5"
+          stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+  <text x="156" y="124" font-family="Inter, sans-serif" font-size="28" font-weight="600" fill="#F8F6F1">AITO</text>
+  <!-- headline -->
+  <text x="80" y="320" font-family="Georgia, serif" font-size="78" font-weight="600" fill="#F8F6F1">Where Wall Street</text>
+  <text x="80" y="412" font-family="Georgia, serif" font-size="78" font-weight="600" fill="#F8F6F1">meets the Mandarin tape.</text>
+  <!-- subtitle -->
+  <text x="80" y="490" font-family="Inter, sans-serif" font-size="26" fill="#9AA1AE">Macro · Markets · Mandarin</text>
+  <!-- footer -->
+  <text x="80" y="570" font-family="JetBrains Mono, monospace" font-size="18" fill="#6A707D">aito.com</text>
+  <text x="1120" y="570" font-family="JetBrains Mono, monospace" font-size="18" fill="#6A707D" text-anchor="end">EST 2026 · NYC · HK</text>
+</svg>

@@ -1,0 +1,34 @@
+{
+  "name": "aito-alto-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AITO Phase 1 — investor-ready prototype. Next.js 15 + TS + Tailwind + next-intl.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@swc/helpers": "^0.5.21",
+    "clsx": "2.1.1",
+    "lucide-react": "0.460.0",
+    "next": "15.0.3",
+    "next-intl": "3.26.0",
+    "react": "19.0.0-rc-66855b96-20241106",
+    "react-dom": "19.0.0-rc-66855b96-20241106",
+    "tailwind-merge": "2.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "22.9.0",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "autoprefixer": "10.4.20",
+    "postcss": "8.4.49",
+    "tailwindcss": "3.4.14",
+    "typescript": "5.6.3",
+    "vitest": "2.1.4"
+  }
+}
