@@ -1,94 +1,130 @@
-# AITO · Alto — Phase 1 Investor Prototype
+# aito — monorepo
 
-Production-grade React/TypeScript scaffold for the AITO/Alto trans-Pacific subscription platform.
+AITO · Alto Phase 1 — trans-Pacific subscription platform. Single git repo, pnpm workspaces, Turborepo pipeline.
 
-This is **not a throwaway mockup**. Every file in `src/lib/domain/*` ships to production: the subscription state machine, paywall rule engine, and entitlement model are exactly what the API will use. The UI uses the same Next.js + Tailwind + shadcn-style stack the Phase 1 design doc specifies.
-
-## What's in here
+## Layout
 
 ```
-aito-alto-prototype/
-├─ src/
-│  ├─ app/[locale]/              ← Next.js App Router with locale prefix
-│  │  ├─ layout.tsx              ← Header + Footer + i18n provider
-│  │  ├─ page.tsx                ← Home (Hero / Pulse / Shows / Bridge / CTA)
-│  │  ├─ pricing/page.tsx        ← Three-tier pricing
-│  │  ├─ articles/[slug]/page.tsx← Article + dynamic paywall
-│  │  ├─ live/page.tsx           ← Live class schedule
-│  │  └─ community/page.tsx      ← Discourse + chat + AMA preview
-│  ├─ components/
-│  │  ├─ site/                   ← Header, Footer, LanguageSwitch
-│  │  ├─ home/                   ← Hero, MarketPulse ticker, ValueProps,
-│  │  │                            FlagshipShows, Bridge, NewsletterCTA
-│  │  ├─ article/Paywall.tsx     ← Drives off lib/domain/paywall.ts
-│  │  ├─ pricing/PricingTier.tsx
-│  │  └─ live/LiveCard.tsx
-│  ├─ lib/domain/                ← THE PRODUCTION CORE
-│  │  ├─ subscription.ts         ← State machine (transition + isActive)
-│  │  ├─ paywall.ts              ← checkAccess(viewer, resource) → Decision
-│  │  ├─ entitlement.ts          ← App-side entitlement model
-│  │  └─ __tests__/              ← Vitest specs
-│  ├─ i18n/
-│  │  ├─ routing.ts              ← Locales: en / zh-CN / zh-TW (+ future)
-│  │  └─ request.ts
-│  └─ middleware.ts
-├─ messages/
-│  ├─ en.json
-│  ├─ zh-CN.json
-│  └─ zh-TW.json
-├─ tailwind.config.ts
-├─ next.config.mjs
-└─ package.json
+aito/
+├── apps/
+│   └── web/                          ← Next.js 15 app — investor demo + W4 production base
+│       ├── src/app/[locale]/         ← 10 pages (Home, Pricing, Article, Live, Community,
+│       │                                Podcast, Newsletter, Dashboard, Signup, About)
+│       ├── src/components/           ← page sections (home/article/pricing/live/site/...)
+│       ├── messages/                 ← en / zh-CN / zh-HK
+│       └── public/                   ← favicon / logomark / OG image / webmanifest
+├── packages/
+│   ├── domain/                       ← @aito/domain — pure TS rules (state machine, paywall)
+│   ├── ui/                           ← @aito/ui — Logo / Button / Badge / Card / TierPill / cn
+│   ├── database/                     ← @aito/database — Prisma schema + client (70 models)
+│   └── config/                       ← @aito/config — shared tsconfig + Tailwind preset
+├── package.json                      ← workspace root
+├── pnpm-workspace.yaml
+├── turbo.json
+├── tsconfig.base.json
+└── .gitignore
 ```
 
-## Run it locally
+## Why monorepo (not separate repos)
+
+- **`@aito/domain`** holds the subscription state machine + paywall rule engine. Web today, Hono API (W6+), React Native (W6+) all import the same `checkAccess()`. Drift between platforms = paywall bypass.
+- **`@aito/ui`** lets W14 admin UI and W6 mobile share Logo / Button / Badge / Card / TierPill without copy-paste.
+- **`@aito/database`** is the single source of truth for the Postgres schema; the web app and the future API both import the generated Prisma client from here.
+- **`@aito/config`** keeps TS strictness and Tailwind tokens consistent across apps. Change brand colors once → everything updates.
+- **Turborepo** caches builds and tests across packages; CI on a change to `@aito/domain` re-runs only what depends on it.
+
+## First-time setup
+
+Requires **Node ≥20** and **pnpm ≥9** (install via `corepack enable && corepack prepare pnpm@9.15.0 --activate`).
 
 ```bash
-cd aito-alto-prototype
-npm install
-npm run dev
+# Clone & install
+cd aito
+pnpm install                           # installs everything across workspaces
+
+# Database (zero-cost local Postgres via Docker)
+pnpm db:up                             # starts postgres on :5432
+pnpm db:migrate                        # applies Prisma migrations
+pnpm db:seed                           # seeds default plans / roles / legal docs / settings
+
+# Run the web app
+pnpm web:dev                           # http://localhost:3000
+
+# Run tests
+pnpm test                              # all packages
+pnpm test:domain                       # just the domain rules
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The middleware will redirect to your browser's preferred locale (or `/en` by default).
+## Daily commands
 
-## Deploy free to Vercel
+| Goal | Command |
+|---|---|
+| Dev server (web only) | `pnpm web:dev` |
+| Dev server (everything in parallel) | `pnpm dev` |
+| Type-check all packages | `pnpm -r type-check` |
+| Run all tests | `pnpm test` |
+| Build for production | `pnpm build` |
+| Format all source | `pnpm format` |
+| Open Prisma Studio | `pnpm db:studio` |
+| Stop local Postgres | `pnpm --filter @aito/database db:down` |
 
-1. Push this folder to a GitHub repo.
-2. Visit [vercel.com](https://vercel.com), sign in with GitHub, click **Import**.
-3. Pick the repo. Framework: Next.js. **No environment variables required for the prototype.**
-4. Click **Deploy**. ~3 minutes later you have a public URL.
+## Workspace deps cheatsheet
 
-Vercel's Edge Network includes a Hong Kong PoP, so HKG users see <50 ms first-byte latency without any paid plan.
+When `apps/web` needs something from a package:
 
-## Run the tests
+```ts
+import { checkAccess, type ViewerContext } from "@aito/domain";
+import { Button, Card, cn } from "@aito/ui";
+import { prisma } from "@aito/database";                // (W4+)
+```
+
+Make sure the consumer's `package.json` declares it:
+
+```json
+{
+  "dependencies": {
+    "@aito/domain": "workspace:*",
+    "@aito/ui": "workspace:*",
+    "@aito/database": "workspace:*"
+  }
+}
+```
+
+## Deploy to Vercel
+
+Vercel auto-detects monorepos when you point it at the right app:
+
+1. Import the GitHub repo
+2. **Root Directory**: `apps/web`
+3. **Build Command**: `cd ../.. && pnpm install && pnpm --filter @aito/web build`
+4. **Install Command**: `cd ../.. && pnpm install`
+5. **Output Directory**: `.next`
+6. Add env vars: `DATABASE_URL`, `DIRECT_DATABASE_URL`, `STRIPE_*` (W4+)
+
+## Migration notes
+
+This repo was migrated from a flat single-app structure on May 18, 2026. The old paths still resolve through deprecated shim re-exports:
+
+```
+src/lib/utils.ts            → re-exports @aito/ui (cn)
+src/lib/domain/*            → re-exports @aito/domain
+src/components/ui/*         → re-exports @aito/ui
+```
+
+After you confirm the new imports work everywhere, you can delete the shim files (sandbox couldn't `rm` them — you'll need to do it on your machine):
 
 ```bash
-npm test
+cd apps/web/src
+rm -rf lib/domain          # tests moved to packages/domain/src/__tests__/
+rm    lib/utils.ts
+rm -rf components/ui
 ```
 
-Two suites:
+## Per-package READMEs
 
-- `subscription.test.ts` — proves every legal transition and rejects every illegal one.
-- `paywall.test.ts` — proves the rule engine for anonymous, free-plan, premium, and pro viewers.
-
-Aim for ≥80% line coverage on `src/lib/domain/**` before Phase 1 W4.
-
-## Adding a new language
-
-1. Create `messages/{locale}.json` (copy `en.json` and translate).
-2. Add the locale to `routing.locales` in `src/i18n/routing.ts`.
-3. Done. Next.js will generate the locale-prefixed route at build time.
-
-The translation file is the **only** place strings live. Components only call `t("namespace.key")`.
-
-## Roadmap notes (matches CTO 24-week plan)
-
-- **W1–W3** — this scaffold. Investor demo. Zero cost.
-- **W4–W5** — wire in Stripe Checkout. Replace the hardcoded `viewer` in the article page with a real session. Plug the homepage Newsletter form into Resend.
-- **W6+** — extract `src/lib/domain/` into `packages/domain` of a Turborepo monorepo. Add `apps/api-global` (Hono on Cloudflare Workers).
-- **W9** — public soft launch on Beehiiv (this site stays as the marketing front; Beehiiv handles email + payments first).
-- **W23** — switch from Beehiiv to self-hosted (this site).
-
-## License
-
-Proprietary. Do not distribute outside AITO/Alto.
+- `apps/web/README.md` — Next.js app layout & dev workflow
+- `apps/web/DEMO_FLOW.md` — 60-second investor walkthrough script
+- `packages/domain/README.md` — state machines, test coverage policy
+- `packages/ui/README.md` — component inventory
+- `packages/database/README.md` — Postgres setup paths, migration philosophy
+- `packages/database/docs/*` — ERD, lifecycles, design decisions (10+ pages)

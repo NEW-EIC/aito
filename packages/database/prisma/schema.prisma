@@ -1,0 +1,2580 @@
+// ============================================================================
+//  AITO / Alto · Phase 1 — Prisma schema (Postgres)
+//  -----------------------------------------------------------------------
+//  Source of truth for all business entities the platform persists. Tier 0
+//  (quant strategy / risk engine internals) lives in a separate, CTO-only
+//  service and is NOT modeled here — only the platform shell is.
+//
+//  Conventions
+//   - Snake_case columns (Postgres native), camelCase Prisma fields.
+//   - All timestamps are `timestamptz`; never `timestamp`.
+//   - Money is stored as integer cents (`*_cents`) + a `currency` ISO code.
+//   - Soft deletes via `deleted_at` on user-visible content.
+//   - All FKs are explicitly named and indexed.
+//   - JSONB for flexible payloads (event bodies, feature flags, evidence).
+//   - Native Postgres enums for state machines and tier keys.
+//
+//  Adjusted for Phase 1 v1.0 constraints (May 2026):
+//   - US-only build. No mainland-China hosting or compliance entities.
+//   - No WeChat mini-program tables.
+//   - Stripe is the only Phase 1 payment provider; alipay/wechat_pay enum
+//     values are reserved for Phase 2+ to avoid a destructive enum migration.
+// ============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto, citext]
+}
+
+// ============================================================================
+//  Identity / Auth
+// ============================================================================
+
+/// A platform end-user. Authentication is delegated to an IdP (Logto / Clerk
+/// / OAuth providers); we never store passwords. The `auth_provider` +
+/// `auth_provider_user_id` pair maps our internal id to the IdP's id.
+model User {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // citext = case-insensitive text; prevents "Foo@x.com" / "foo@x.com" duplicates
+  email           String    @unique @db.Citext
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz()
+  phone           String?
+  phoneVerifiedAt DateTime? @map("phone_verified_at") @db.Timestamptz()
+
+  displayName     String?   @map("display_name")
+  avatarAssetId   String?   @map("avatar_asset_id") @db.Uuid
+  avatar          MediaAsset? @relation("UserAvatar", fields: [avatarAssetId], references: [id])
+
+  preferredLocale Locale    @default(en) @map("preferred_locale")
+  timezone        String    @default("America/New_York")
+  countryCode     String?   @map("country_code") // ISO-3166-1 alpha-2
+
+  // External identity provider (we don't store credentials)
+  authProvider       AuthProvider @default(logto) @map("auth_provider")
+  authProviderUserId String?      @map("auth_provider_user_id")
+
+  // Marketing
+  marketingOptInAt   DateTime? @map("marketing_opt_in_at") @db.Timestamptz()
+
+  // Lifecycle
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz()
+  lastSeenAt      DateTime? @map("last_seen_at") @db.Timestamptz()
+
+  // Relations
+  sessions                    Session[]
+  externalIdentities          ExternalIdentity[]
+  subscriptions               Subscription[]
+  paymentMethods              PaymentMethod[]
+  payments                    Payment[]
+  invoices                    Invoice[]
+  kycVerifications            KycVerification[]
+  imMemberships               ImMembership[]
+  liveAttendances             LiveAttendance[]
+  newsletterSubscriptions     NewsletterSubscription[]
+  ownedReferralCodes          ReferralCode[]          @relation("ReferralCodeOwner")
+  attributionsAsReferer       ReferralAttribution[]   @relation("Referer")
+  attributionsAsReferee       ReferralAttribution[]   @relation("Referee")
+  auditLogEntries             AuditLogEntry[]
+
+  // RBAC / staff
+  staffProfile                StaffProfile?
+  userRoles                   UserRole[]              @relation("UserRoleHolder")
+  grantedRoles                UserRole[]              @relation("UserRoleGrantedBy")
+
+  // Behavior + bookmarks
+  articleViews                ArticleView[]
+  articleReadProgress         ArticleReadProgress[]
+  podcastListenEvents         PodcastListenEvent[]
+  podcastListenProgress       PodcastListenProgress[]
+  contentBookmarks            ContentBookmark[]
+  contentReactions            ContentReaction[]
+  contentShares               ContentShare[]
+  searchQueries               SearchQueryLog[]
+
+  // Content authorship audit
+  articleRevisionsEdited      ArticleTranslationRevision[]
+
+  // Legal acceptance
+  legalAcceptances            UserLegalAcceptance[]
+
+  // Media assets uploaded by this user
+  uploadedAssets              MediaAsset[]            @relation("MediaAssetUploader")
+
+  // P0+P1 additions
+  notificationPreferences     NotificationPreference[]
+  deviceTokens                DeviceToken[]
+  mfaFactors                  UserMfaFactor[]
+  apiTokensCreated            ApiToken[]              @relation("ApiTokenCreator")
+  couponRedemptions           CouponRedemption[]
+  accountCredit               AccountCredit?
+  accountCreditEntriesGranted AccountCreditEntry[]    @relation("CreditEntryGranter")
+  payoutsReceived             Payout[]                @relation("PayoutRecipient")
+  giftsPurchased              GiftSubscription[]      @relation("GiftPurchaser")
+  giftsReceived               GiftSubscription[]      @relation("GiftRecipient")
+  liveRegistrations           LiveRegistration[]
+  reviewsPerformed            ArticleReview[]         @relation("ArticleReviewer")
+  erratumsPosted              ArticleErratum[]        @relation("ErratumPostedBy")
+  platformSettingsUpdated     PlatformSetting[]       @relation("SettingUpdatedBy")
+
+  @@unique([authProvider, authProviderUserId])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+enum AuthProvider {
+  logto
+  clerk
+  google
+  apple
+  email_otp
+
+  @@map("auth_provider")
+}
+
+/// Server-validated session. If you adopt a stateless JWT-only auth,
+/// you can leave this empty; it's here to support session revocation.
+model Session {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash   String    @unique @map("token_hash")
+  ipAddress   String?   @map("ip_address") @db.Inet
+  userAgent   String?   @map("user_agent")
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz()
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz()
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// Maps a user to their identity in a downstream system (Discourse, Stream
+/// Chat, Beehiiv). One row per (user, provider).
+model ExternalIdentity {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider       ExternalProvider
+  externalUserId String           @map("external_user_id")
+  metadata       Json?            @db.JsonB
+
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@unique([provider, externalUserId])
+  @@unique([userId, provider])
+  @@map("external_identities")
+}
+
+enum ExternalProvider {
+  discourse
+  stream_chat
+  beehiiv
+  resend
+
+  @@map("external_provider")
+}
+
+// ============================================================================
+//  Locale / Shared
+// ============================================================================
+
+enum Locale {
+  en
+  zh_CN @map("zh-CN")
+  zh_TW @map("zh-TW")
+  ja
+  ko
+  fr
+
+  @@map("locale")
+}
+
+// ============================================================================
+//  Subscription / Billing
+// ============================================================================
+
+/// Plan = Reader / Premium / Pro Desk. Stripe price/product IDs are stored
+/// per-billing-interval so we can drive Checkout from this single row.
+model Plan {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key       PlanKey @unique
+
+  name      String
+  summary   String?
+
+  // Pricing in smallest currency unit (USD cents)
+  monthlyPriceCents Int?    @map("monthly_price_cents")
+  annualPriceCents  Int?    @map("annual_price_cents")
+  currency          String  @default("USD")
+
+  // Stripe linkage (one product, two prices for monthly / annual)
+  stripeProductId      String? @unique @map("stripe_product_id")
+  stripeMonthlyPriceId String? @unique @map("stripe_monthly_price_id")
+  stripeAnnualPriceId  String? @unique @map("stripe_annual_price_id")
+
+  /// Feature matrix. Read by the paywall rule engine.
+  /// Example: { liveReplay: true, liveQA: false, modelFiles: false }
+  features  Json    @db.JsonB
+
+  active    Boolean @default(true)
+  sortOrder Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+enum PlanKey {
+  free
+  premium
+  pro
+
+  @@map("plan_key")
+}
+
+/// One row per user × subscription period. State follows the state machine
+/// in `lib/domain/subscription.ts` of the prototype repo.
+///
+/// NOTE on uniqueness: a user may have at most ONE subscription in
+/// (trial | active | past_due | grace_period). We enforce this at the
+/// application layer because Postgres partial unique indexes aren't first-
+/// class in Prisma; see migrations/{ts}_partial_unique_active_sub.sql for
+/// the DB-level guarantee.
+model Subscription {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String              @map("user_id") @db.Uuid
+  user            User                @relation(fields: [userId], references: [id])
+  planId          String              @map("plan_id") @db.Uuid
+  plan            Plan                @relation(fields: [planId], references: [id])
+
+  state           SubscriptionState
+  billingInterval BillingInterval     @map("billing_interval")
+
+  // Trial window
+  trialStartedAt  DateTime?           @map("trial_started_at") @db.Timestamptz()
+  trialEndsAt     DateTime?           @map("trial_ends_at") @db.Timestamptz()
+
+  // Current paid period
+  currentPeriodStart DateTime?        @map("current_period_start") @db.Timestamptz()
+  currentPeriodEnd   DateTime?        @map("current_period_end") @db.Timestamptz()
+
+  // Grace period after a failed payment (default 7 days)
+  graceEndsAt        DateTime?        @map("grace_ends_at") @db.Timestamptz()
+
+  // Cancellation
+  canceledAt           DateTime?           @map("canceled_at") @db.Timestamptz()
+  cancelAtPeriodEnd    Boolean             @default(false) @map("cancel_at_period_end")
+  cancellationReason   CancellationReason? @map("cancellation_reason")
+  cancellationFeedback String?             @map("cancellation_feedback") @db.Text
+
+  // Stripe linkage
+  stripeSubscriptionId String?        @unique @map("stripe_subscription_id")
+  stripeCustomerId     String?        @map("stripe_customer_id")
+
+  // Where the user signed up (homepage / article-cta / referral / ...)
+  signupSource         String?        @map("signup_source")
+  // Referral attribution (denormalized for fast reads)
+  referralCodeId       String?        @map("referral_code_id") @db.Uuid
+
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+
+  events             SubscriptionEvent[]
+  invoices           Invoice[]
+  couponRedemptions  CouponRedemption[]
+
+  @@index([userId])
+  @@index([state])
+  @@index([currentPeriodEnd])
+  @@index([stripeCustomerId])
+  @@map("subscriptions")
+}
+
+enum SubscriptionState {
+  trial
+  active
+  past_due
+  grace_period
+  canceled
+  expired
+
+  @@map("subscription_state")
+}
+
+enum BillingInterval {
+  monthly
+  annual
+
+  @@map("billing_interval")
+}
+
+/// Append-only log of every subscription state transition. Doubles as a
+/// transactional outbox: downstream consumers (Resend "trial started"
+/// email, Stream Chat group add, Discourse SSO) read unprocessed rows and
+/// stamp `processed_at` when done. Idempotent on `external_event_id`.
+model SubscriptionEvent {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subscriptionId  String            @map("subscription_id") @db.Uuid
+  subscription    Subscription      @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  eventType       String            @map("event_type")
+  fromState       SubscriptionState? @map("from_state")
+  toState         SubscriptionState  @map("to_state")
+
+  externalEventId String?           @unique @map("external_event_id")
+  payload         Json              @db.JsonB
+
+  processedAt     DateTime?         @map("processed_at") @db.Timestamptz()
+
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([subscriptionId])
+  @@index([processedAt])
+  @@map("subscription_events")
+}
+
+/// A saved card / wallet. Mirrored from Stripe; never holds raw card data.
+model PaymentMethod {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String          @map("user_id") @db.Uuid
+  user        User            @relation(fields: [userId], references: [id])
+
+  provider    PaymentProvider
+  externalId  String          @map("external_id") // Stripe pm_xxx
+
+  brand       String?         // visa, mastercard, amex, ...
+  last4       String?         @db.VarChar(4)
+  expMonth    Int?            @map("exp_month")
+  expYear     Int?            @map("exp_year")
+
+  isDefault   Boolean         @default(false) @map("is_default")
+
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+  removedAt   DateTime?       @map("removed_at") @db.Timestamptz()
+
+  @@unique([provider, externalId])
+  @@index([userId])
+  @@map("payment_methods")
+}
+
+enum PaymentProvider {
+  stripe
+  alipay        // reserved for Phase 2+
+  wechat_pay    // reserved for Phase 2+
+  manual        // comped / invoiced
+
+  @@map("payment_provider")
+}
+
+model Invoice {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String          @map("user_id") @db.Uuid
+  user              User            @relation(fields: [userId], references: [id])
+  subscriptionId    String?         @map("subscription_id") @db.Uuid
+  subscription      Subscription?   @relation(fields: [subscriptionId], references: [id])
+
+  status            InvoiceStatus
+
+  amountDueCents    Int             @map("amount_due_cents")
+  amountPaidCents   Int             @default(0) @map("amount_paid_cents")
+  taxCents          Int             @default(0) @map("tax_cents")
+  currency          String          @default("USD")
+
+  provider          PaymentProvider @default(stripe)
+  externalInvoiceId String?         @unique @map("external_invoice_id")
+
+  issuedAt          DateTime        @map("issued_at") @db.Timestamptz()
+  dueAt             DateTime?       @map("due_at") @db.Timestamptz()
+  paidAt            DateTime?       @map("paid_at") @db.Timestamptz()
+
+  hostedInvoiceUrl  String?         @map("hosted_invoice_url")
+  pdfUrl            String?         @map("pdf_url")
+
+  payments          Payment[]
+
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  draft
+  open
+  paid
+  void
+  uncollectible
+
+  @@map("invoice_status")
+}
+
+model Payment {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String          @map("user_id") @db.Uuid
+  user                User            @relation(fields: [userId], references: [id])
+  invoiceId           String?         @map("invoice_id") @db.Uuid
+  invoice             Invoice?        @relation(fields: [invoiceId], references: [id])
+
+  status              PaymentStatus
+
+  amountCents         Int             @map("amount_cents")
+  currency            String          @default("USD")
+
+  provider            PaymentProvider
+  externalId          String          @map("external_id")        // Stripe pi_xxx
+  externalChargeId    String?         @map("external_charge_id") // Stripe ch_xxx
+
+  // Idempotency for webhook handlers
+  externalEventId     String?         @unique @map("external_event_id")
+
+  failureCode         String?         @map("failure_code")
+  failureMessage      String?         @map("failure_message")
+
+  refundedAmountCents Int             @default(0) @map("refunded_amount_cents")
+
+  refunds             Refund[]
+
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@unique([provider, externalId])
+  @@index([userId])
+  @@index([status])
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+  refunded
+  partially_refunded
+
+  @@map("payment_status")
+}
+
+model Refund {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paymentId       String   @map("payment_id") @db.Uuid
+  payment         Payment  @relation(fields: [paymentId], references: [id])
+
+  amountCents     Int      @map("amount_cents")
+  reason          String?
+
+  externalId      String   @map("external_id") // Stripe re_xxx
+  externalEventId String?  @unique @map("external_event_id")
+
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@unique([externalId])
+  @@index([paymentId])
+  @@map("refunds")
+}
+
+// ============================================================================
+//  Content (Articles / Newsletters / Podcasts)
+// ============================================================================
+
+model Author {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug            String           @unique
+
+  name            String
+  title           String?
+  bio             String?          @db.Text
+
+  avatarAssetId   String?          @map("avatar_asset_id") @db.Uuid
+  avatar          MediaAsset?      @relation("AuthorAvatar", fields: [avatarAssetId], references: [id])
+
+  twitterHandle   String?          @map("twitter_handle")
+  linkedinUrl     String?          @map("linkedin_url")
+
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+
+  articleAuthors      ArticleAuthor[]
+  liveStreamHosts     LiveStreamHost[]
+  positionDisclosures EditorialPositionDisclosure[]
+
+  @@map("authors")
+}
+
+/// Generic content unit. `kind` distinguishes podcast / newsletter / blog;
+/// each kind may have additional metadata in a 1:1 child table
+/// (`PodcastEpisode`, `NewsletterCampaign`).
+model Article {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug          String         @unique
+
+  kind          ArticleKind
+  status        ArticleStatus
+
+  /// What plan tier is needed to read the FULL body. The free preview is
+  /// always rendered; the paywall component cuts off based on this.
+  requiredTier  PlanKey        @default(free) @map("required_tier")
+
+  /// Compliance classification for financial content.
+  /// `specific_recommendation` triggers mandatory legal review + extra disclaimer.
+  complianceClass ComplianceClass @default(market_commentary) @map("compliance_class")
+
+  publishedAt   DateTime?      @map("published_at") @db.Timestamptz()
+  scheduledFor  DateTime?      @map("scheduled_for") @db.Timestamptz()
+
+  heroImageAssetId String?     @map("hero_image_asset_id") @db.Uuid
+  heroImage     MediaAsset?    @relation("ArticleHeroImage", fields: [heroImageAssetId], references: [id])
+
+  categoryId    String?        @map("category_id") @db.Uuid
+  category      Category?      @relation(fields: [categoryId], references: [id])
+
+  // 1:1 children for kind-specific extension
+  newsletterCampaign NewsletterCampaign?
+  podcastEpisode     PodcastEpisode?
+
+  // M:N
+  authors       ArticleAuthor[]
+  tags          ArticleTag[]
+  translations  ArticleTranslation[]
+
+  // Behavior tracking
+  views         ArticleView[]
+  readProgress  ArticleReadProgress[]
+
+  // Compliance workflow
+  reviews              ArticleReview[]
+  positionDisclosures  EditorialPositionDisclosure[]
+  errata               ArticleErratum[]
+  sources              ArticleSource[]
+  dailyMetrics         ArticleDailyMetric[]
+
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt     DateTime?      @map("deleted_at") @db.Timestamptz()
+
+  @@index([status, publishedAt])
+  @@index([kind, requiredTier])
+  @@index([categoryId])
+  @@index([complianceClass])
+  @@map("articles")
+}
+
+enum ArticleKind {
+  newsletter
+  podcast
+  blog
+
+  @@map("article_kind")
+}
+
+enum ArticleStatus {
+  draft
+  in_review        // editor handed off to reviewer
+  legal_review     // flagged as specific_recommendation, needs legal sign-off
+  scheduled
+  published
+  archived
+
+  @@map("article_status")
+}
+
+/// Localized article body. Each (article, locale) pair holds title +
+/// MDX body + SEO fields. We do NOT auto-translate — translations are
+/// human-edited rows in this table.
+model ArticleTranslation {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId      String   @map("article_id") @db.Uuid
+  article        Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  locale         Locale
+
+  title          String
+  subtitle       String?
+  bodyMdx        String   @map("body_mdx") @db.Text
+  excerpt        String   @db.Text
+
+  // SEO
+  seoTitle       String?  @map("seo_title")
+  seoDescription String?  @map("seo_description")
+
+  // Monotonic version number, bumped on every save
+  currentVersion Int      @default(1) @map("current_version")
+
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  revisions      ArticleTranslationRevision[]
+
+  @@unique([articleId, locale])
+  @@map("article_translations")
+}
+
+model ArticleAuthor {
+  articleId String  @map("article_id") @db.Uuid
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  authorId  String  @map("author_id") @db.Uuid
+  author    Author  @relation(fields: [authorId], references: [id])
+
+  role      String  @default("author") // author / editor / host / guest
+  sortOrder Int     @default(0) @map("sort_order")
+
+  @@id([articleId, authorId])
+  @@map("article_authors")
+}
+
+model Category {
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug      String     @unique
+  name      String
+
+  parentId  String?    @map("parent_id") @db.Uuid
+  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryHierarchy")
+
+  articles  Article[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug      String       @unique
+  name      String
+
+  articles  ArticleTag[]
+
+  @@map("tags")
+}
+
+model ArticleTag {
+  articleId String  @map("article_id") @db.Uuid
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tagId     String  @map("tag_id") @db.Uuid
+  tag       Tag     @relation(fields: [tagId], references: [id])
+
+  @@id([articleId, tagId])
+  @@map("article_tags")
+}
+
+/// 1:1 extension on Article when kind = podcast.
+model PodcastEpisode {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId        String   @unique @map("article_id") @db.Uuid
+  article          Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  episodeNumber    Int      @map("episode_number")
+  seasonNumber     Int?     @map("season_number")
+
+  // Audio — canonical reference lives on MediaAsset.
+  // durationSeconds is duplicated here for fast list queries; it MUST match
+  // audioAsset.durationSeconds (enforced by app-layer save hook).
+  audioAssetId     String   @map("audio_asset_id") @db.Uuid
+  audioAsset       MediaAsset @relation("PodcastAudio", fields: [audioAssetId], references: [id])
+  durationSeconds  Int      @map("duration_seconds")
+
+  // Transcript file (text/vtt/srt). Optional — not all episodes have one.
+  transcriptAssetId String? @map("transcript_asset_id") @db.Uuid
+  transcriptAsset   MediaAsset? @relation("PodcastTranscript", fields: [transcriptAssetId], references: [id])
+
+  // Distribution
+  appleEpisodeId   String?  @map("apple_episode_id")
+  spotifyEpisodeId String?  @map("spotify_episode_id")
+
+  // Behavior
+  listenEvents     PodcastListenEvent[]
+  listenProgress   PodcastListenProgress[]
+  dailyMetrics     PodcastEpisodeDailyMetric[]
+
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("podcast_episodes")
+}
+
+// ============================================================================
+//  Newsletter delivery (Resend / Beehiiv dual-send)
+// ============================================================================
+
+/// A single newsletter "blast". One Article → one NewsletterCampaign.
+model NewsletterCampaign {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId          String           @unique @map("article_id") @db.Uuid
+  article            Article          @relation(fields: [articleId], references: [id])
+
+  status             CampaignStatus
+
+  /// Localized subject lines: { "en": "...", "zh-CN": "..." }
+  subjectLines       Json             @db.JsonB @map("subject_lines")
+  /// Localized preview text (the snippet shown in inbox lists).
+  previewTexts       Json             @db.JsonB @map("preview_texts")
+
+  // Targeting
+  targetTier         PlanKey?         @map("target_tier")     // null = all subscribers
+  targetLocale       Locale?          @map("target_locale")   // null = all locales
+
+  // Provider routing
+  provider           EmailProvider    @default(resend)
+  externalCampaignId String?          @map("external_campaign_id")
+
+  scheduledFor       DateTime?        @map("scheduled_for") @db.Timestamptz()
+  sentAt             DateTime?        @map("sent_at") @db.Timestamptz()
+
+  // Cached aggregates (refreshed by webhook handlers)
+  recipientCount     Int              @default(0) @map("recipient_count")
+  deliveredCount     Int              @default(0) @map("delivered_count")
+  openCount          Int              @default(0) @map("open_count")
+  clickCount         Int              @default(0) @map("click_count")
+  unsubscribeCount   Int              @default(0) @map("unsubscribe_count")
+  bounceCount        Int              @default(0) @map("bounce_count")
+
+  sends              NewsletterSend[]
+
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([status])
+  @@map("newsletter_campaigns")
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  sending
+  sent
+  failed
+
+  @@map("campaign_status")
+}
+
+enum EmailProvider {
+  beehiiv
+  resend
+  postmark
+
+  @@map("email_provider")
+}
+
+/// A subscriber to the email list (NOT the same as a paid Subscription).
+/// A user with a paid plan typically also has a NewsletterSubscription —
+/// they are joined via `userId` when known, but anonymous email-only
+/// captures (homepage CTA) are also tracked here.
+model NewsletterSubscription {
+  id                  String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String?                      @map("user_id") @db.Uuid
+  user                User?                        @relation(fields: [userId], references: [id])
+
+  email               String                       @unique @db.Citext
+  locale              Locale                       @default(en)
+
+  status              NewsletterSubscriptionStatus
+  source              String?                      // homepage / article-cta / referral
+
+  // Beehiiv linkage during dual-send window (W17–W22)
+  beehiivSubscriberId String?                      @map("beehiiv_subscriber_id")
+
+  subscribedAt        DateTime                     @default(now()) @map("subscribed_at") @db.Timestamptz()
+  unsubscribedAt      DateTime?                    @map("unsubscribed_at") @db.Timestamptz()
+  unsubscribeReason   UnsubscribeReason?           @map("unsubscribe_reason")
+  unsubscribeFeedback String?                      @map("unsubscribe_feedback") @db.Text
+
+  sends               NewsletterSend[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("newsletter_subscriptions")
+}
+
+enum NewsletterSubscriptionStatus {
+  active
+  unsubscribed
+  bounced
+  complained
+
+  @@map("newsletter_subscription_status")
+}
+
+/// One row per (campaign, subscriber). Tracks the per-recipient send
+/// lifecycle: queued → sent → delivered → opened → clicked.
+model NewsletterSend {
+  id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId        String                  @map("campaign_id") @db.Uuid
+  campaign          NewsletterCampaign      @relation(fields: [campaignId], references: [id])
+  subscriptionId    String                  @map("subscription_id") @db.Uuid
+  subscription      NewsletterSubscription  @relation(fields: [subscriptionId], references: [id])
+
+  status            SendStatus
+
+  externalMessageId String?                 @map("external_message_id")
+
+  sentAt            DateTime?               @map("sent_at") @db.Timestamptz()
+  deliveredAt       DateTime?               @map("delivered_at") @db.Timestamptz()
+  openedAt          DateTime?               @map("opened_at") @db.Timestamptz()
+  firstClickedAt    DateTime?               @map("first_clicked_at") @db.Timestamptz()
+  bouncedAt         DateTime?               @map("bounced_at") @db.Timestamptz()
+  bounceType        BounceType?             @map("bounce_type")
+  /// Raw provider code: SMTP code or Resend/SendGrid reason string.
+  bounceCode        String?                 @map("bounce_code")
+
+  failureMessage    String?                 @map("failure_message")
+
+  linkClicks        NewsletterLinkClick[]
+
+  @@unique([campaignId, subscriptionId])
+  @@index([status])
+  @@map("newsletter_sends")
+}
+
+enum SendStatus {
+  queued
+  sent
+  delivered
+  bounced
+  failed
+
+  @@map("send_status")
+}
+
+// ============================================================================
+//  Live streaming (Mux integration)
+// ============================================================================
+
+model LiveStream {
+  id                       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  title                    String
+  description              String?          @db.Text
+
+  scheduledStartAt         DateTime         @map("scheduled_start_at") @db.Timestamptz()
+  scheduledEndAt           DateTime?        @map("scheduled_end_at") @db.Timestamptz()
+  actualStartAt            DateTime?        @map("actual_start_at") @db.Timestamptz()
+  actualEndAt              DateTime?        @map("actual_end_at") @db.Timestamptz()
+
+  status                   LiveStreamStatus
+  requiredTier             PlanKey          @default(premium) @map("required_tier")
+
+  coverImageAssetId        String?          @map("cover_image_asset_id") @db.Uuid
+  coverImage               MediaAsset?      @relation("LiveStreamCover", fields: [coverImageAssetId], references: [id])
+
+  // Mux integration
+  muxLiveStreamId          String?          @unique @map("mux_live_stream_id")
+  muxPlaybackId            String?          @map("mux_playback_id")
+  /// Tier-0 sensitive: never expose to client. Read access controlled by RLS.
+  muxStreamKey             String?          @map("mux_stream_key")
+
+  // Recording (auto-generated by Mux post-broadcast)
+  recordingPlaybackId      String?          @map("recording_playback_id")
+  recordingDurationSeconds Int?             @map("recording_duration_seconds")
+  recordingAvailableUntil  DateTime?        @map("recording_available_until") @db.Timestamptz()
+
+  hosts                    LiveStreamHost[]
+  attendances              LiveAttendance[]
+  registrations            LiveRegistration[]
+  chapters                 LiveRecordingChapter[]
+
+  createdAt                DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt                DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([status, scheduledStartAt])
+  @@map("live_streams")
+}
+
+enum LiveStreamStatus {
+  scheduled
+  live
+  ended
+  canceled
+
+  @@map("live_stream_status")
+}
+
+model LiveStreamHost {
+  liveStreamId String     @map("live_stream_id") @db.Uuid
+  liveStream   LiveStream @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
+  authorId     String     @map("author_id") @db.Uuid
+  author       Author     @relation(fields: [authorId], references: [id])
+
+  role         String     // host / guest / moderator
+  sortOrder    Int        @default(0) @map("sort_order")
+
+  @@id([liveStreamId, authorId])
+  @@map("live_stream_hosts")
+}
+
+model LiveAttendance {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveStreamId    String          @map("live_stream_id") @db.Uuid
+  liveStream      LiveStream      @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
+  userId          String          @map("user_id") @db.Uuid
+  user            User            @relation(fields: [userId], references: [id])
+
+  attendanceType  AttendanceType  @map("attendance_type")
+
+  joinedAt        DateTime        @default(now()) @map("joined_at") @db.Timestamptz()
+  leftAt          DateTime?       @map("left_at") @db.Timestamptz()
+
+  @@index([liveStreamId])
+  @@index([userId])
+  @@map("live_attendances")
+}
+
+enum AttendanceType {
+  live
+  replay
+
+  @@map("attendance_type")
+}
+
+// ============================================================================
+//  IM / Community (Stream Chat for messages, this DB for membership only)
+// ============================================================================
+
+/// A chat group (e.g. #macro-pulse). The actual messages live in Stream
+/// Chat — we only track membership and metadata here, so the paywall and
+/// admin tooling can join across users + groups.
+model ImGroup {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug              String          @unique
+
+  name              String
+  description       String?
+
+  requiredTier      PlanKey         @default(premium) @map("required_tier")
+
+  // Stream Chat linkage
+  streamChannelId   String?         @unique @map("stream_channel_id")
+  streamChannelType String?         @default("messaging") @map("stream_channel_type")
+
+  /// Cached for display; refreshed by membership-change triggers
+  memberCount       Int             @default(0) @map("member_count")
+
+  active            Boolean         @default(true)
+
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
+
+  memberships       ImMembership[]
+
+  @@map("im_groups")
+}
+
+model ImMembership {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupId   String       @map("group_id") @db.Uuid
+  group     ImGroup      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String       @map("user_id") @db.Uuid
+  user      User         @relation(fields: [userId], references: [id])
+
+  role      ImMemberRole @default(member)
+
+  joinedAt  DateTime     @default(now()) @map("joined_at") @db.Timestamptz()
+  leftAt    DateTime?    @map("left_at") @db.Timestamptz()
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("im_memberships")
+}
+
+enum ImMemberRole {
+  member
+  moderator
+  owner
+
+  @@map("im_member_role")
+}
+
+// ============================================================================
+//  KYC (tiered: L0 → L3)
+// ============================================================================
+
+/// One row per user × KYC level. L0 (email/phone) is implicit on User
+/// itself; rows here exist for L1+ where we need an audit trail.
+///
+/// PII fields are stored as ciphertext — application-layer encryption with
+/// a KMS-managed key. The `*_cipher` suffix is a guardrail against
+/// accidentally querying plain values.
+model KycVerification {
+  id                          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                      String        @map("user_id") @db.Uuid
+  user                        User          @relation(fields: [userId], references: [id])
+
+  level                       KycLevel
+  status                      KycStatus
+
+  // Provider used to verify (Phase 1 likely none; Phase 2: Persona / Sumsub)
+  provider                    String?
+  externalCaseId              String?       @map("external_case_id")
+
+  submittedAt                 DateTime?     @map("submitted_at") @db.Timestamptz()
+  decidedAt                   DateTime?     @map("decided_at") @db.Timestamptz()
+
+  reviewerNotes               String?       @map("reviewer_notes") @db.Text
+  rejectionReason             String?       @map("rejection_reason")
+
+  // Encrypted PII (column-level encryption; never index-search these)
+  legalNameCipher             String?       @map("legal_name_cipher")
+  dobCipher                   String?       @map("dob_cipher")
+  taxIdCipher                 String?       @map("tax_id_cipher")
+  countryOfResidence          String?       @map("country_of_residence") // ISO-2
+
+  // Phase 2: SEC Reg D accredited investor
+  isAccreditedInvestor        Boolean       @default(false) @map("is_accredited_investor")
+  accreditedInvestorEvidence  Json?         @db.JsonB @map("accredited_investor_evidence")
+
+  documents                   KycDocument[]
+
+  createdAt                   DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt                   DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([userId, level])
+  @@index([status])
+  @@map("kyc_verifications")
+}
+
+enum KycLevel {
+  L0  // email + (optional) phone
+  L1  // legal name
+  L2  // government ID
+  L3  // accredited investor (Phase 2+)
+
+  @@map("kyc_level")
+}
+
+enum KycStatus {
+  not_started
+  pending
+  approved
+  rejected
+  expired
+
+  @@map("kyc_status")
+}
+
+model KycDocument {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  verificationId  String           @map("verification_id") @db.Uuid
+  verification    KycVerification  @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  documentType    String           @map("document_type") // passport / drivers_license / utility_bill / tax_return
+
+  /// Object-storage reference (R2/S3 key, KMS-encrypted at rest)
+  storageKey      String           @map("storage_key")
+  contentType     String           @map("content_type")
+  fileSizeBytes   Int              @map("file_size_bytes")
+
+  uploadedAt      DateTime         @default(now()) @map("uploaded_at") @db.Timestamptz()
+  expiresAt       DateTime?        @map("expires_at") @db.Timestamptz() // for purge job
+
+  @@index([verificationId])
+  @@map("kyc_documents")
+}
+
+// ============================================================================
+//  Audit log
+// ============================================================================
+
+/// Append-only audit trail. Every state-changing operation that impacts
+/// money, content visibility, or user records writes one row here.
+/// Retention: 6 months online, then archived to cold storage.
+model AuditLogEntry {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  actorId      String?    @map("actor_id") @db.Uuid
+  actor        User?      @relation(fields: [actorId], references: [id])
+  actorType    ActorType  @map("actor_type")
+
+  action       String     // user.login / subscription.canceled / article.published
+  resourceType String?    @map("resource_type")
+  resourceId   String?    @map("resource_id")
+
+  oldValue     Json?      @db.JsonB @map("old_value")
+  newValue     Json?      @db.JsonB @map("new_value")
+
+  ipAddress    String?    @map("ip_address") @db.Inet
+  userAgent    String?    @map("user_agent")
+  /// Free-form context (request id, correlation id, ...)
+  metadata     Json?      @db.JsonB
+
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([actorId, createdAt])
+  @@index([resourceType, resourceId])
+  @@index([action, createdAt])
+  @@map("audit_log_entries")
+}
+
+enum ActorType {
+  user
+  admin
+  system
+  webhook
+
+  @@map("actor_type")
+}
+
+// ============================================================================
+//  Referral / affiliate
+// ============================================================================
+
+model ReferralCode {
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId              String                @map("owner_id") @db.Uuid
+  owner                User                  @relation("ReferralCodeOwner", fields: [ownerId], references: [id])
+
+  code                 String                @unique
+
+  /// What the referee gets (e.g. extended free trial)
+  refereeRewardPlanKey PlanKey?              @map("referee_reward_plan_key")
+  refereeRewardDays    Int?                  @map("referee_reward_days")
+  /// What the referer gets (account credit, in cents)
+  refererRewardCents   Int?                  @map("referer_reward_cents")
+
+  active               Boolean               @default(true)
+
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz()
+  expiresAt            DateTime?             @map("expires_at") @db.Timestamptz()
+
+  attributions         ReferralAttribution[]
+
+  @@index([ownerId])
+  @@map("referral_codes")
+}
+
+model ReferralAttribution {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  referralCodeId  String        @map("referral_code_id") @db.Uuid
+  referralCode    ReferralCode  @relation(fields: [referralCodeId], references: [id])
+
+  refererId       String        @map("referer_id") @db.Uuid
+  referer         User          @relation("Referer", fields: [refererId], references: [id])
+
+  refereeId       String        @unique @map("referee_id") @db.Uuid
+  referee         User          @relation("Referee", fields: [refereeId], references: [id])
+
+  attributedAt    DateTime      @default(now()) @map("attributed_at") @db.Timestamptz()
+  /// Stamped when the referee converts (subscribes to a paid plan)
+  convertedAt     DateTime?     @map("converted_at") @db.Timestamptz()
+
+  rewardPaidAt    DateTime?     @map("reward_paid_at") @db.Timestamptz()
+  rewardCents     Int?          @map("reward_cents")
+
+  @@index([refererId])
+  @@index([referralCodeId])
+  @@map("referral_attributions")
+}
+
+// ============================================================================
+//  Webhook event ledger (idempotency for ALL inbound provider events)
+// ============================================================================
+
+/// Every webhook from Stripe / Mux / Stream Chat / Resend lands here first,
+/// before being dispatched to its handler. The `(provider, external_event_id)`
+/// uniqueness gives us free idempotency: if Stripe re-sends the same event,
+/// the second insert errors out and the handler is skipped.
+model WebhookEvent {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  provider        String    // stripe / mux / stream-chat / resend / beehiiv
+  externalEventId String    @map("external_event_id")
+  eventType       String    @map("event_type")
+
+  payload         Json      @db.JsonB
+
+  receivedAt      DateTime  @default(now()) @map("received_at") @db.Timestamptz()
+  processedAt     DateTime? @map("processed_at") @db.Timestamptz()
+  failedAt        DateTime? @map("failed_at") @db.Timestamptz()
+  failureMessage  String?   @map("failure_message")
+  retryCount      Int       @default(0) @map("retry_count")
+
+  @@unique([provider, externalEventId])
+  @@index([processedAt])
+  @@index([provider, eventType])
+  @@map("webhook_events")
+}
+
+// ============================================================================
+//  RBAC — Role / Permission / UserRole / RolePermission / StaffProfile
+//
+//  Design notes (also in docs/decisions.md):
+//   - We do NOT have a separate AdminUser table. Staff are still rows in
+//     `users`; their staff-only fields live on `StaffProfile` (1:1). This
+//     avoids dual-identity bugs and lets a staff member also use the
+//     consumer product without two accounts.
+//   - We do NOT have a separate AdminAction table. `audit_log_entries`
+//     already covers it; admin actions are simply rows where
+//     `actor_type = 'admin'`. A reporting view in SQL surfaces them.
+//   - Permissions are string-keyed (e.g. "content.publish") so adding
+//     new ones doesn't require a Prisma migration — just an INSERT.
+//   - Role grants are time-bounded (`expires_at`) for temporary access
+//     and contractor offboarding.
+// ============================================================================
+
+/// Internal staff (editorial, engineering, ops, finance). 1:1 extension
+/// of `users` — every staff member has both rows.
+model StaffProfile {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String    @unique @map("user_id") @db.Uuid
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  employeeId          String?   @unique @map("employee_id")
+  department          StaffDepartment
+  jobTitle            String?   @map("job_title")
+
+  managerId           String?   @map("manager_id") @db.Uuid
+  manager             StaffProfile?  @relation("StaffManager", fields: [managerId], references: [id])
+  reports             StaffProfile[] @relation("StaffManager")
+
+  hiredAt             DateTime  @map("hired_at") @db.Timestamptz()
+  departedAt          DateTime? @map("departed_at") @db.Timestamptz()
+
+  /// Hardware 2FA (YubiKey) required to access admin tooling.
+  requireHardware2FA  Boolean   @default(true) @map("require_hardware_2fa")
+
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([department])
+  @@index([departedAt])
+  @@map("staff_profiles")
+}
+
+enum StaffDepartment {
+  editorial
+  engineering
+  operations
+  finance
+  legal
+  executive
+
+  @@map("staff_department")
+}
+
+/// Named bundle of permissions. Roles are the unit a human admin assigns
+/// (you don't pick permissions one-by-one in the admin UI).
+model Role {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key         String           @unique     // editor / kyc_reviewer / finance_admin / super_admin
+  name        String
+  description String?          @db.Text
+
+  /// System roles are seed-managed; the admin UI can't delete them.
+  isSystem    Boolean          @default(false) @map("is_system")
+
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+
+  permissions RolePermission[]
+  userRoles   UserRole[]
+
+  @@map("roles")
+}
+
+/// Fine-grained capability check key. Look up with `permission.key`.
+/// Canonical keys grouped by category:
+///   content.{draft, publish, archive, translate}
+///   media.{upload, delete}
+///   finance.{read, refund, comp_subscription}
+///   kyc.{review, view_pii}
+///   user.{view, impersonate, delete, suspend}
+///   live.{schedule, broadcast, record}
+///   system.{settings, roles, audit_log}
+model Permission {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key         String           @unique
+  category    PermissionCategory
+  description String?          @db.Text
+  /// Hint: does this permission allow modification (vs read-only)?
+  isWrite     Boolean          @default(false) @map("is_write")
+  isSystem    Boolean          @default(true) @map("is_system")
+
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+
+  roles       RolePermission[]
+
+  @@index([category])
+  @@map("permissions")
+}
+
+enum PermissionCategory {
+  content
+  media
+  finance
+  kyc
+  user
+  live
+  system
+
+  @@map("permission_category")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String     @map("permission_id") @db.Uuid
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  grantedAt    DateTime   @default(now()) @map("granted_at") @db.Timestamptz()
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+/// User × Role assignment. May be scoped (e.g. moderator of one IM group)
+/// or global (super_admin). Supports time-bounded grants for contractors.
+model UserRole {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  user          User      @relation("UserRoleHolder", fields: [userId], references: [id])
+  roleId        String    @map("role_id") @db.Uuid
+  role          Role      @relation(fields: [roleId], references: [id])
+
+  grantedAt     DateTime  @default(now()) @map("granted_at") @db.Timestamptz()
+  grantedById   String?   @map("granted_by_id") @db.Uuid
+  grantedBy     User?     @relation("UserRoleGrantedBy", fields: [grantedById], references: [id])
+
+  expiresAt     DateTime? @map("expires_at") @db.Timestamptz()
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz()
+
+  /// Optional scope. `scope_type` + `scope_id` narrow this grant to a
+  /// single resource (e.g. moderator of one specific IM group).
+  /// Both null = global grant.
+  scopeType     String?   @map("scope_type")
+  scopeId       String?   @map("scope_id") @db.Uuid
+
+  @@unique([userId, roleId, scopeType, scopeId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([expiresAt])
+  @@map("user_roles")
+}
+
+// ============================================================================
+//  Content access / behavior (article views, reads, plays, social)
+//
+//  These tables can grow fast. PostHog (free tier 1M events/mo) is our
+//  preferred home for high-cardinality clickstream events; THIS database
+//  holds the records that need joins with paywall/subscription tables.
+//
+//  Retention policy (see docs/decisions.md):
+//   - article_views: 90 days online, then aggregate to daily rollups + purge raw
+//   - podcast_listen_events: 90 days, same
+//   - search_query_logs: 180 days
+//   - All others (progress, bookmarks, reactions, shares): kept indefinitely
+// ============================================================================
+
+/// One row per "page view" of an article. Anonymous reads are tracked by
+/// `visitor_id` (a cookie fingerprint), authenticated by `user_id`.
+model ArticleView {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId       String   @map("article_id") @db.Uuid
+  article         Article  @relation(fields: [articleId], references: [id])
+
+  userId          String?  @map("user_id") @db.Uuid
+  user            User?    @relation(fields: [userId], references: [id])
+  visitorId       String?  @map("visitor_id")
+
+  locale          Locale
+
+  /// Did the user hit the paywall (saw teaser only)?
+  wasPaywalled    Boolean  @default(false) @map("was_paywalled")
+
+  referrer        String?
+  utmSource       String?  @map("utm_source")
+  utmMedium       String?  @map("utm_medium")
+  utmCampaign     String?  @map("utm_campaign")
+
+  deviceType      String?  @map("device_type")     // mobile / tablet / desktop
+  ipAddress       String?  @map("ip_address") @db.Inet
+  userAgent       String?  @map("user_agent")
+
+  viewedAt        DateTime @default(now()) @map("viewed_at") @db.Timestamptz()
+
+  @@index([articleId, viewedAt])
+  @@index([userId, viewedAt])
+  @@index([visitorId])
+  @@index([wasPaywalled])
+  @@map("article_views")
+}
+
+/// Per-user resume state for an article. Updated on scroll / time milestones.
+model ArticleReadProgress {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId         String    @map("article_id") @db.Uuid
+  article           Article   @relation(fields: [articleId], references: [id])
+  userId            String    @map("user_id") @db.Uuid
+  user              User      @relation(fields: [userId], references: [id])
+
+  /// 0-100; furthest scroll percentage reached.
+  progressPercent   Int       @map("progress_percent")
+  /// Cumulative seconds spent reading across all visits.
+  timeSpentSeconds  Int       @default(0) @map("time_spent_seconds")
+
+  /// Stamped when scroll ≥90% AND timeSpent ≥30s.
+  completedAt       DateTime? @map("completed_at") @db.Timestamptz()
+
+  firstReadAt       DateTime  @default(now()) @map("first_read_at") @db.Timestamptz()
+  lastReadAt        DateTime  @default(now()) @map("last_read_at") @db.Timestamptz()
+
+  @@unique([articleId, userId])
+  @@index([userId, lastReadAt])
+  @@map("article_read_progress")
+}
+
+/// Append-only log of podcast playback events for analytics. Truncate to
+/// 90 days; the long-term aggregate lives in PodcastListenProgress.
+model PodcastListenEvent {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  episodeId       String           @map("episode_id") @db.Uuid
+  episode         PodcastEpisode   @relation(fields: [episodeId], references: [id])
+
+  userId          String?          @map("user_id") @db.Uuid
+  user            User?            @relation(fields: [userId], references: [id])
+  visitorId       String?          @map("visitor_id")
+
+  eventType       PodcastEventType @map("event_type")
+  /// Position in the audio at time of event.
+  positionSeconds Int              @map("position_seconds")
+
+  /// Where playback happened: web / ios / android / apple_podcasts / spotify / overcast
+  source          String?
+  deviceType      String?          @map("device_type")
+
+  occurredAt      DateTime         @default(now()) @map("occurred_at") @db.Timestamptz()
+
+  @@index([episodeId, occurredAt])
+  @@index([userId])
+  @@index([eventType])
+  @@map("podcast_listen_events")
+}
+
+enum PodcastEventType {
+  play
+  pause
+  seek
+  complete
+  download
+
+  @@map("podcast_event_type")
+}
+
+/// Per-user resume state for a podcast episode. One row per (user, episode).
+model PodcastListenProgress {
+  id                  String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  episodeId           String         @map("episode_id") @db.Uuid
+  episode             PodcastEpisode @relation(fields: [episodeId], references: [id])
+  userId              String         @map("user_id") @db.Uuid
+  user                User           @relation(fields: [userId], references: [id])
+
+  /// Where to resume from.
+  positionSeconds     Int            @map("position_seconds")
+  /// Furthest second reached across all sessions.
+  furthestSeconds     Int            @map("furthest_seconds")
+  /// Stamped when `furthest_seconds` is within 30s of `durationSeconds`.
+  completedAt         DateTime?      @map("completed_at") @db.Timestamptz()
+
+  /// Cumulative listen time across all sessions.
+  totalListenSeconds  Int            @default(0) @map("total_listen_seconds")
+
+  firstStartedAt      DateTime       @default(now()) @map("first_started_at") @db.Timestamptz()
+  lastListenedAt      DateTime       @default(now()) @map("last_listened_at") @db.Timestamptz()
+
+  @@unique([episodeId, userId])
+  @@index([userId, lastListenedAt])
+  @@map("podcast_listen_progress")
+}
+
+/// User-saved content. Polymorphic — resource_type discriminates.
+/// NOTE: app-layer enforces referential integrity (Postgres can't, since
+/// resource_id may point to any of several tables). A nightly job prunes
+/// orphans.
+model ContentBookmark {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String           @map("user_id") @db.Uuid
+  user            User             @relation(fields: [userId], references: [id])
+
+  resourceType    BookmarkableType @map("resource_type")
+  resourceId      String           @map("resource_id") @db.Uuid
+
+  note            String?          @db.Text
+
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@unique([userId, resourceType, resourceId])
+  @@index([userId, createdAt])
+  @@index([resourceType, resourceId])
+  @@map("content_bookmarks")
+}
+
+enum BookmarkableType {
+  article
+  podcast_episode
+  live_stream
+
+  @@map("bookmarkable_type")
+}
+
+/// Reactions = like / insightful / etc. One reaction per type per resource
+/// per user. Same polymorphic caveat as ContentBookmark.
+model ContentReaction {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String        @map("user_id") @db.Uuid
+  user          User          @relation(fields: [userId], references: [id])
+
+  resourceType  ReactableType @map("resource_type")
+  resourceId    String        @map("resource_id") @db.Uuid
+
+  reactionType  ReactionType  @map("reaction_type")
+
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@unique([userId, resourceType, resourceId, reactionType])
+  @@index([resourceType, resourceId, reactionType])
+  @@map("content_reactions")
+}
+
+enum ReactableType {
+  article
+  podcast_episode
+  live_stream
+
+  @@map("reactable_type")
+}
+
+enum ReactionType {
+  like
+  insightful
+  bookmark
+  agree
+  disagree
+
+  @@map("reaction_type")
+}
+
+/// Outbound share events. Captures the destination so we can track
+/// viral channel performance (Twitter vs LinkedIn vs WeChat etc.).
+model ContentShare {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  resourceType    String   @map("resource_type")    // article / podcast_episode / live_stream
+  resourceId      String   @map("resource_id") @db.Uuid
+
+  userId          String?  @map("user_id") @db.Uuid
+  user            User?    @relation(fields: [userId], references: [id])
+  visitorId       String?  @map("visitor_id")
+
+  /// twitter / x / linkedin / email / copy_link / wechat / weibo / facebook
+  destination     String
+
+  sharedAt        DateTime @default(now()) @map("shared_at") @db.Timestamptz()
+
+  @@index([resourceType, resourceId])
+  @@index([userId])
+  @@index([destination, sharedAt])
+  @@map("content_shares")
+}
+
+/// Every search query made on the platform. Drives "what content do users
+/// actually want" analysis and zero-result detection.
+model SearchQueryLog {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  userId            String?  @map("user_id") @db.Uuid
+  user              User?    @relation(fields: [userId], references: [id])
+  visitorId         String?  @map("visitor_id")
+
+  query             String
+  locale            Locale
+
+  resultCount       Int      @map("result_count")
+  /// If the user clicked a result, what was it?
+  clickedResultId   String?  @map("clicked_result_id") @db.Uuid
+  clickedResultType String?  @map("clicked_result_type")  // article / podcast_episode / ...
+
+  queriedAt         DateTime @default(now()) @map("queried_at") @db.Timestamptz()
+
+  @@index([queriedAt])
+  @@index([userId])
+  @@index([resultCount])  // for zero-result analysis
+  @@map("search_query_logs")
+}
+
+// ============================================================================
+//  Content version history (ArticleTranslationRevision)
+//
+//  Every save to `article_translations` ALSO writes a snapshot row here.
+//  Lets us:
+//   - Diff between any two saves
+//   - Roll back to a previous version
+//   - Audit "who changed what in this Premium piece, when"
+//   - Recover from accidental destruction
+//
+//  Implementation note: write the revision row inside the same DB tx as
+//  the translation update. Use Prisma middleware or an after-commit hook.
+// ============================================================================
+
+model ArticleTranslationRevision {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  translationId   String              @map("translation_id") @db.Uuid
+  translation     ArticleTranslation  @relation(fields: [translationId], references: [id], onDelete: Cascade)
+
+  /// Monotonic version number, unique within (translation_id).
+  versionNumber   Int                 @map("version_number")
+
+  // Snapshot of the translation fields at the time of save
+  title           String
+  subtitle        String?
+  bodyMdx         String              @map("body_mdx") @db.Text
+  excerpt         String              @db.Text
+  seoTitle        String?             @map("seo_title")
+  seoDescription  String?             @map("seo_description")
+
+  // Change context
+  editorId        String?             @map("editor_id") @db.Uuid
+  editor          User?               @relation(fields: [editorId], references: [id])
+  changeSummary   String?             @map("change_summary") @db.Text
+
+  triggerType     RevisionTriggerType @map("trigger_type")
+
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@unique([translationId, versionNumber])
+  @@index([translationId, createdAt])
+  @@index([editorId])
+  @@map("article_translation_revisions")
+}
+
+enum RevisionTriggerType {
+  manual_save
+  auto_save
+  publish
+  unpublish
+  rollback
+
+  @@map("revision_trigger_type")
+}
+
+// ============================================================================
+//  Legal documents & user acceptances
+//
+//  Why this exists: AITO/Alto publishes FINANCIAL content. Regulators
+//  (SEC for Reg D, FINRA for adviser-adjacent activity, CSRC for any
+//  Greater-China outreach later) will eventually ask: "show me proof that
+//  user X agreed to your Risk Disclosure version Y on date Z".
+//
+//  We store:
+//   - LegalDocument: every published version of every legal doc, by locale
+//   - UserLegalAcceptance: one row per user × document version, with IP,
+//     UA, and a content hash so we can prove what they actually saw
+// ============================================================================
+
+model LegalDocument {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key                  LegalDocumentKey
+  locale               Locale
+
+  /// Human version string ("v1.0", "2026-05-09", "summer-2026").
+  version              String
+
+  title                String
+  bodyMdx              String                 @db.Text @map("body_mdx")
+  summary              String?                @db.Text
+
+  /// When this version becomes the active version for new acceptances.
+  effectiveAt          DateTime               @map("effective_at") @db.Timestamptz()
+  /// Material changes require re-acceptance from existing users.
+  requiresReacceptance Boolean                @default(true) @map("requires_reacceptance")
+
+  publishedAt          DateTime?              @map("published_at") @db.Timestamptz()
+
+  /// Sha-256 of `body_mdx` at publish time; copied into each acceptance.
+  bodyHash             String                 @map("body_hash") @db.VarChar(64)
+
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz()
+
+  acceptances          UserLegalAcceptance[]
+
+  @@unique([key, locale, version])
+  @@index([key, locale, effectiveAt])
+  @@map("legal_documents")
+}
+
+enum LegalDocumentKey {
+  terms_of_service
+  privacy_policy
+  risk_disclosure
+  cookie_policy
+  live_stream_terms
+  paid_subscription_agreement
+
+  @@map("legal_document_key")
+}
+
+/// One acceptance per (user, document_version). If the document is
+/// republished with `requires_reacceptance`, the user must accept again
+/// — a fresh row is written.
+model UserLegalAcceptance {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String         @map("user_id") @db.Uuid
+  user             User           @relation(fields: [userId], references: [id])
+
+  legalDocumentId  String         @map("legal_document_id") @db.Uuid
+  legalDocument    LegalDocument  @relation(fields: [legalDocumentId], references: [id])
+
+  /// Where did the acceptance happen? signup / paywall_checkout /
+  /// kyc_submission / live_join / republished_modal
+  context          String
+
+  acceptedAt       DateTime       @default(now()) @map("accepted_at") @db.Timestamptz()
+
+  ipAddress        String?        @map("ip_address") @db.Inet
+  userAgent        String?        @map("user_agent")
+
+  /// Sha-256 of the body the user saw. Should equal legalDocument.bodyHash
+  /// at the moment of acceptance; recorded here for audit reproducibility.
+  acceptedBodyHash String         @map("accepted_body_hash") @db.VarChar(64)
+
+  @@unique([userId, legalDocumentId])
+  @@index([userId])
+  @@index([legalDocumentId])
+  @@index([acceptedAt])
+  @@map("user_legal_acceptances")
+}
+
+// ============================================================================
+//  Newsletter per-click detail
+// ============================================================================
+
+/// One row per click on a tracked link in a sent newsletter. Click totals
+/// on NewsletterCampaign / NewsletterSend are denormalized aggregates;
+/// this is the source-of-truth detail.
+model NewsletterLinkClick {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sendId          String          @map("send_id") @db.Uuid
+  send            NewsletterSend  @relation(fields: [sendId], references: [id], onDelete: Cascade)
+
+  /// The full URL the user clicked.
+  url             String          @db.Text
+  /// Template-side identifier (e.g. "primary_cta", "footer_unsubscribe").
+  /// Lets us compare A/B variants without parsing URLs.
+  linkKey         String?         @map("link_key")
+
+  ipAddress       String?         @map("ip_address") @db.Inet
+  userAgent       String?         @map("user_agent")
+  deviceType      String?         @map("device_type")
+
+  clickedAt       DateTime        @default(now()) @map("clicked_at") @db.Timestamptz()
+
+  @@index([sendId, clickedAt])
+  @@index([linkKey, clickedAt])
+  @@map("newsletter_link_clicks")
+}
+
+// ============================================================================
+//  Media assets (unified storage + usage tracking)
+//
+//  Single record per uploaded file. Articles / podcasts / authors / live
+//  streams link to assets via dedicated FKs (for the hot read path);
+//  `media_asset_usages` is the polymorphic ledger that lets us answer
+//  "where is this asset used?" for cleanup and copyright workflows.
+//
+//  KYC documents are intentionally NOT in this table — they're PII with
+//  a different security context (column-level encryption, retention
+//  policy, KMS key). See KycDocument.
+// ============================================================================
+
+model MediaAsset {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  kind            MediaAssetKind
+
+  // Storage
+  storageProvider String          @default("cloudflare_r2") @map("storage_provider") // cloudflare_r2 / s3 / mux / external_url
+  storageKey      String          @map("storage_key")
+  /// CDN-fronted public URL. Null for private assets.
+  publicUrl       String?         @map("public_url")
+
+  // File metadata
+  contentType     String          @map("content_type")
+  fileSizeBytes   Int             @map("file_size_bytes")
+  checksumSha256  String?         @map("checksum_sha256") @db.VarChar(64)
+
+  // Image-specific (null for audio/video)
+  widthPx         Int?            @map("width_px")
+  heightPx        Int?            @map("height_px")
+  /// LQIP — hex color
+  dominantColor   String?         @map("dominant_color") @db.VarChar(7)
+  /// LQIP — BlurHash string
+  blurhash        String?
+
+  // Audio / video-specific
+  durationSeconds Int?            @map("duration_seconds")
+
+  // Descriptive metadata
+  altText         String?         @map("alt_text")
+  caption         String?         @db.Text
+  credit          String?
+
+  uploadedById    String?         @map("uploaded_by_id") @db.Uuid
+  uploadedBy      User?           @relation("MediaAssetUploader", fields: [uploadedById], references: [id])
+
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt       DateTime?       @map("deleted_at") @db.Timestamptz()
+
+  usages          MediaAssetUsage[]
+
+  // Inverse of hot-path FKs declared on other models
+  usersUsingAsAvatar         User[]            @relation("UserAvatar")
+  articlesUsingAsHero        Article[]         @relation("ArticleHeroImage")
+  podcastEpisodesUsingAsAudio       PodcastEpisode[] @relation("PodcastAudio")
+  podcastEpisodesUsingAsTranscript  PodcastEpisode[] @relation("PodcastTranscript")
+  authorsUsingAsAvatar       Author[]          @relation("AuthorAvatar")
+  liveStreamsUsingAsCover    LiveStream[]      @relation("LiveStreamCover")
+
+  @@index([kind])
+  @@index([storageKey])
+  @@index([deletedAt])
+  @@map("media_assets")
+}
+
+enum MediaAssetKind {
+  image
+  audio
+  video
+  pdf
+  subtitle
+  transcript
+  document
+
+  @@map("media_asset_kind")
+}
+
+/// Polymorphic usage ledger. One row per (asset, resource, role).
+/// Lets us answer "where is asset X used?" in a single index lookup,
+/// without scanning every content table.
+///
+/// Maintained alongside the hot-path FKs by the app's media service:
+/// when you set `article.heroImageAssetId = X`, you ALSO write a usage
+/// row with role="hero_image". Removal works the same way.
+model MediaAssetUsage {
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assetId       String     @map("asset_id") @db.Uuid
+  asset         MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  resourceType  String     @map("resource_type")  // article / podcast_episode / live_stream / author / user
+  resourceId    String     @map("resource_id") @db.Uuid
+
+  /// hero_image / audio_file / transcript / avatar / cover / og_image / ...
+  role          String
+
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@unique([assetId, resourceType, resourceId, role])
+  @@index([resourceType, resourceId])
+  @@index([assetId])
+  @@map("media_asset_usages")
+}
+
+// ============================================================================
+//  P0 · Notification preferences (granular, per-channel × per-kind opt-in)
+//
+//  Why this is P0: CAN-SPAM (15 USC §7704) requires per-message-category
+//  opt-out. A single global marketing_opt_in flag fails the test once we
+//  ship Daily Pulse + Weekly Newsletter + Live reminders.
+// ============================================================================
+
+model NotificationPreference {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String              @map("user_id") @db.Uuid
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  channel     NotificationChannel
+  kind        NotificationKind
+
+  enabled     Boolean             @default(true)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@unique([userId, channel, kind])
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+enum NotificationChannel {
+  email
+  push
+  sms
+  in_app
+
+  @@map("notification_channel")
+}
+
+enum NotificationKind {
+  daily_pulse
+  weekly_newsletter
+  live_class_reminder
+  ama_announcement
+  product_update
+  /// Transactional — receipts, password resets. Cannot be disabled by user.
+  billing_receipt
+  /// Transactional — payment failed, subscription expiring.
+  billing_alert
+  community_mention
+  /// Pro Desk only — research alerts on saved tickers.
+  research_alert
+
+  @@map("notification_kind")
+}
+
+// ============================================================================
+//  P0 · Cancellation / unsubscribe reasons (enums to enrich existing fields)
+// ============================================================================
+
+enum CancellationReason {
+  too_expensive
+  not_using
+  found_alternative
+  content_quality
+  technical_issues
+  temporarily_pausing
+  other
+
+  @@map("cancellation_reason")
+}
+
+enum UnsubscribeReason {
+  too_frequent
+  not_relevant
+  content_quality
+  expected_different
+  technical_issues
+  never_signed_up
+  other
+
+  @@map("unsubscribe_reason")
+}
+
+// ============================================================================
+//  P0 · Bounce type (enum to enrich NewsletterSend.bounceType)
+// ============================================================================
+
+enum BounceType {
+  /// Permanent — mailbox doesn't exist. Auto-unsubscribe required to
+  /// protect sender reputation.
+  hard
+  /// Temporary — mailbox full, server down, etc. Retry policy applies.
+  soft
+  /// Email server rejected (blocklist, spam classification).
+  blocked
+  /// Recipient marked as spam. Treat as hard + complaint.
+  complaint
+
+  @@map("bounce_type")
+}
+
+// ============================================================================
+//  P0 · Coupons / discounts (mirror Stripe coupons)
+// ============================================================================
+
+model Coupon {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code            String         @unique
+  name            String?
+
+  /// Discount: exactly one of percentOff or amountOffCents is set.
+  percentOff      Int?           @map("percent_off")        // 0-100
+  amountOffCents  Int?           @map("amount_off_cents")
+  currency        String         @default("USD")
+
+  duration        CouponDuration
+  /// Required if duration = repeating
+  durationMonths  Int?           @map("duration_months")
+
+  /// Restrict to specific plans (null = applies to any plan).
+  appliesToPlanKeys PlanKey[]    @map("applies_to_plan_keys")
+
+  maxRedemptions    Int?         @map("max_redemptions")
+  redeemedCount     Int          @default(0) @map("redeemed_count")
+  expiresAt         DateTime?    @map("expires_at") @db.Timestamptz()
+
+  // Stripe linkage
+  stripeCouponId    String?      @unique @map("stripe_coupon_id")
+
+  active            Boolean      @default(true)
+
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz()
+
+  redemptions       CouponRedemption[]
+
+  @@index([active, expiresAt])
+  @@map("coupons")
+}
+
+enum CouponDuration {
+  once
+  forever
+  repeating
+
+  @@map("coupon_duration")
+}
+
+model CouponRedemption {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  couponId        String        @map("coupon_id") @db.Uuid
+  coupon          Coupon        @relation(fields: [couponId], references: [id])
+
+  userId          String        @map("user_id") @db.Uuid
+  user            User          @relation(fields: [userId], references: [id])
+
+  subscriptionId  String?       @map("subscription_id") @db.Uuid
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  redeemedAt      DateTime      @default(now()) @map("redeemed_at") @db.Timestamptz()
+
+  @@unique([couponId, userId, subscriptionId])
+  @@index([userId])
+  @@index([couponId])
+  @@map("coupon_redemptions")
+}
+
+// ============================================================================
+//  P0 · Editorial review + COI disclosure + Errata (financial compliance)
+//
+//  Why this is P0: AITO/Alto publishes financial content. SEC complaints,
+//  FINRA-adjacent activity, and CSRC (future Greater-China) inquiries
+//  will demand proof of editorial review, conflict-of-interest disclosure
+//  by authors, and a public corrections trail.
+// ============================================================================
+
+model ArticleReview {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId     String         @map("article_id") @db.Uuid
+  article       Article        @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  reviewerId    String         @map("reviewer_id") @db.Uuid
+  reviewer      User           @relation("ArticleReviewer", fields: [reviewerId], references: [id])
+
+  reviewType    ReviewType     @map("review_type")
+  decision      ReviewDecision
+
+  notes         String?        @db.Text
+  /// What article version was reviewed. Lets us tell whether a later edit
+  /// invalidated this review and a re-review is required.
+  reviewedVersion Int          @map("reviewed_version")
+
+  reviewedAt    DateTime       @default(now()) @map("reviewed_at") @db.Timestamptz()
+
+  @@index([articleId, reviewedAt])
+  @@index([reviewerId])
+  @@map("article_reviews")
+}
+
+enum ReviewType {
+  editorial
+  legal
+  compliance
+
+  @@map("review_type")
+}
+
+enum ReviewDecision {
+  approved
+  rejected
+  needs_changes
+
+  @@map("review_decision")
+}
+
+/// Author's position in a security mentioned in an article. Mandatory
+/// disclosure for SEC compliance. Renders on the public article page.
+model EditorialPositionDisclosure {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId     String       @map("article_id") @db.Uuid
+  article       Article      @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  authorId      String       @map("author_id") @db.Uuid
+  author        Author       @relation(fields: [authorId], references: [id])
+
+  ticker        String       // "TSLA", "BTC", "USDCNH"
+  positionType  PositionType @map("position_type")
+  /// Public disclosure text shown to readers.
+  disclosure    String       @db.Text
+
+  disclosedAt   DateTime     @default(now()) @map("disclosed_at") @db.Timestamptz()
+
+  @@unique([articleId, authorId, ticker])
+  @@index([articleId])
+  @@index([ticker])
+  @@map("editorial_position_disclosures")
+}
+
+enum PositionType {
+  long
+  short
+  options_long
+  options_short
+  /// Author has no position but family / immediate household does.
+  family_member
+  /// Author has no position but firm / advisory client does.
+  related_party
+  none
+
+  @@map("position_type")
+}
+
+/// Post-publication correction. Shown publicly with a "corrected on …" note.
+model ArticleErratum {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId       String   @map("article_id") @db.Uuid
+  article         Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  /// Human description of what changed.
+  description     String   @db.Text
+  /// Original (incorrect) text, if applicable.
+  originalText    String?  @map("original_text") @db.Text
+  /// Corrected text, if applicable.
+  correctedText   String?  @map("corrected_text") @db.Text
+
+  postedById      String   @map("posted_by_id") @db.Uuid
+  postedBy        User     @relation("ErratumPostedBy", fields: [postedById], references: [id])
+
+  /// Show this correction on the article page (vs internal-only).
+  publiclyShown   Boolean  @default(true) @map("publicly_shown")
+
+  postedAt        DateTime @default(now()) @map("posted_at") @db.Timestamptz()
+
+  @@index([articleId, postedAt])
+  @@map("article_errata")
+}
+
+/// Citation for a fact / chart / quote in an article.
+model ArticleSource {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId    String   @map("article_id") @db.Uuid
+  article      Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  citation     String   // "Bloomberg, May 9 2026"
+  url          String?
+  accessedAt   DateTime? @map("accessed_at") @db.Timestamptz()
+  sortOrder    Int      @default(0) @map("sort_order")
+
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([articleId])
+  @@map("article_sources")
+}
+
+enum ComplianceClass {
+  general_information
+  educational
+  market_commentary
+  /// Triggers mandatory legal review + extra disclaimer banner.
+  specific_recommendation
+
+  @@map("compliance_class")
+}
+
+// ============================================================================
+//  P0 · Device tokens (push) + API tokens (machine auth)
+// ============================================================================
+
+/// Per-device push notification token. One row per (platform, token).
+/// Token rotation: insert a new row on enrolment; mark the old one
+/// `revokedAt` when the user signs out or APNs/FCM returns an unregistered
+/// response.
+model DeviceToken {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String         @map("user_id") @db.Uuid
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  platform    DevicePlatform
+  /// Opaque token from APNs / FCM / Web Push subscription endpoint.
+  token       String         @db.Text
+  /// "Chris's iPhone 15 Pro" — set from device name where available.
+  deviceName  String?        @map("device_name")
+  appVersion  String?        @map("app_version")
+  osVersion   String?        @map("os_version")
+
+  enrolledAt  DateTime       @default(now()) @map("enrolled_at") @db.Timestamptz()
+  lastUsedAt  DateTime       @default(now()) @map("last_used_at") @db.Timestamptz()
+  revokedAt   DateTime?      @map("revoked_at") @db.Timestamptz()
+
+  @@unique([platform, token])
+  @@index([userId])
+  @@index([revokedAt])
+  @@map("device_tokens")
+}
+
+enum DevicePlatform {
+  ios_apns
+  android_fcm
+  web_push
+
+  @@map("device_platform")
+}
+
+/// Long-lived machine credential. Mobile apps, partner integrations,
+/// internal services. Plaintext token shown ONCE at creation; only the
+/// sha256 is persisted.
+model ApiToken {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+
+  /// sha256(plaintext_token). Lookup by hash on every authenticated request.
+  tokenHash      String    @unique @map("token_hash") @db.VarChar(64)
+  /// Last 4 chars of plaintext for UI display ("…a3f2").
+  tokenLast4     String    @map("token_last4") @db.VarChar(4)
+
+  /// Postgres array of scope strings ("read:articles", "write:newsletter").
+  scopes         String[]
+
+  createdById    String    @map("created_by_id") @db.Uuid
+  createdBy      User      @relation("ApiTokenCreator", fields: [createdById], references: [id])
+
+  /// Optional rate limit in requests / minute. Null = no app-level cap.
+  rateLimitRpm   Int?      @map("rate_limit_rpm")
+
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz()
+  lastUsedAt     DateTime? @map("last_used_at") @db.Timestamptz()
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz()
+
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([createdById])
+  @@index([revokedAt])
+  @@map("api_tokens")
+}
+
+// ============================================================================
+//  P1 · App-layer MFA factors (for step-up authentication on sensitive ops)
+//
+//  Distinct from IdP-managed login MFA. Used to gate refunds, KYC PII
+//  decryption, admin role grants — anything where a stolen session alone
+//  shouldn't be sufficient.
+// ============================================================================
+
+model UserMfaFactor {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String        @map("user_id") @db.Uuid
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  factorType    MfaFactorType @map("factor_type")
+  /// Human label ("YubiKey 5C", "iPhone Authenticator").
+  label         String?
+
+  /// TOTP secret (encrypted) OR WebAuthn credential public-key blob (raw,
+  /// public-key only). For recovery_code rows, this holds the hashed code.
+  secretCipher  String        @map("secret_cipher") @db.Text
+
+  /// For WebAuthn: credential ID + AAGUID + sign counter (encoded JSON).
+  metadata      Json?         @db.JsonB
+
+  enrolledAt    DateTime      @default(now()) @map("enrolled_at") @db.Timestamptz()
+  lastUsedAt    DateTime?     @map("last_used_at") @db.Timestamptz()
+  disabledAt    DateTime?     @map("disabled_at") @db.Timestamptz()
+
+  @@index([userId, disabledAt])
+  @@map("user_mfa_factors")
+}
+
+enum MfaFactorType {
+  totp
+  webauthn
+  recovery_code
+  sms          // last resort, discouraged
+
+  @@map("mfa_factor_type")
+}
+
+// ============================================================================
+//  P1 · Account credit (in-platform balance) + Payout (cash out)
+//
+//  Account credit pays for future invoices (or for users to redeem on a
+//  Gift Subscription).  Payout is the opposite: cash out to a bank /
+//  Stripe Connect account.
+// ============================================================================
+
+model AccountCredit {
+  userId          String   @id @map("user_id") @db.Uuid
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Materialized aggregate of `account_credit_entries.change_cents`.
+  /// App-layer hook updates this on every entry insert.
+  balanceCents    Int      @default(0) @map("balance_cents")
+  currency        String   @default("USD")
+
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("account_credits")
+}
+
+model AccountCreditEntry {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String       @map("user_id") @db.Uuid
+
+  /// Positive grants credit, negative debits it. Sum == AccountCredit.balanceCents.
+  changeCents     Int          @map("change_cents")
+  currency        String       @default("USD")
+
+  reason          CreditReason
+  /// Optional FK to the invoice this entry funded (for debits).
+  invoiceId       String?      @map("invoice_id") @db.Uuid
+
+  /// Who created this entry (admin grants comp, system processes referral).
+  grantedById     String?      @map("granted_by_id") @db.Uuid
+  grantedBy       User?        @relation("CreditEntryGranter", fields: [grantedById], references: [id])
+
+  description     String?      @db.Text
+
+  occurredAt      DateTime     @default(now()) @map("occurred_at") @db.Timestamptz()
+
+  @@index([userId, occurredAt])
+  @@index([reason])
+  @@map("account_credit_entries")
+}
+
+enum CreditReason {
+  referral_reward
+  refund_credit
+  comp_grant
+  promo_credit
+  spent_on_invoice
+  expired
+  manual_adjustment
+
+  @@map("credit_reason")
+}
+
+model Payout {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String         @map("user_id") @db.Uuid
+  user              User           @relation("PayoutRecipient", fields: [userId], references: [id])
+
+  amountCents       Int            @map("amount_cents")
+  currency          String         @default("USD")
+
+  provider          PayoutProvider
+  status            PayoutStatus
+
+  externalPayoutId  String?        @unique @map("external_payout_id")
+
+  /// Why this payout was created (referral_reward / affiliate_commission / ...).
+  reason            String?
+
+  requestedAt       DateTime       @default(now()) @map("requested_at") @db.Timestamptz()
+  processedAt       DateTime?      @map("processed_at") @db.Timestamptz()
+  failedAt          DateTime?      @map("failed_at") @db.Timestamptz()
+  failureMessage    String?        @map("failure_message")
+
+  @@index([userId])
+  @@index([status])
+  @@map("payouts")
+}
+
+enum PayoutProvider {
+  stripe_connect
+  paypal
+  wire_transfer
+  account_credit  // "pay back" by adding to in-platform balance
+
+  @@map("payout_provider")
+}
+
+enum PayoutStatus {
+  pending
+  processing
+  paid
+  failed
+  canceled
+
+  @@map("payout_status")
+}
+
+// ============================================================================
+//  P1 · Gift subscriptions
+// ============================================================================
+
+model GiftSubscription {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  purchaserId         String          @map("purchaser_id") @db.Uuid
+  purchaser           User            @relation("GiftPurchaser", fields: [purchaserId], references: [id])
+
+  recipientEmail      String          @db.Citext
+  recipientName       String?         @map("recipient_name")
+  giftMessage         String?         @map("gift_message") @db.Text
+
+  planId              String          @map("plan_id") @db.Uuid
+  billingInterval     BillingInterval @map("billing_interval")
+
+  /// One-time charge captured up front via Stripe.
+  amountCents         Int             @map("amount_cents")
+  currency            String          @default("USD")
+  stripePaymentIntentId String?       @map("stripe_payment_intent_id")
+
+  /// Random token sent in the redemption email.
+  redemptionToken     String          @unique @map("redemption_token")
+  redemptionUrl       String?         @map("redemption_url")
+
+  /// Optional scheduled delivery (birthdays, holidays).
+  scheduledDeliveryAt DateTime?       @map("scheduled_delivery_at") @db.Timestamptz()
+  deliveredAt         DateTime?       @map("delivered_at") @db.Timestamptz()
+
+  redeemedAt          DateTime?       @map("redeemed_at") @db.Timestamptz()
+  redeemedByUserId    String?         @map("redeemed_by_user_id") @db.Uuid
+  redeemedByUser      User?           @relation("GiftRecipient", fields: [redeemedByUserId], references: [id])
+
+  /// If the gift is never redeemed, when does it expire?
+  expiresAt           DateTime?       @map("expires_at") @db.Timestamptz()
+
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([purchaserId])
+  @@index([recipientEmail])
+  @@index([redeemedAt])
+  @@map("gift_subscriptions")
+}
+
+// ============================================================================
+//  P1 · Live class registration + recording chapters
+// ============================================================================
+
+/// User signed up to attend (RSVP). Separate from LiveAttendance, which
+/// captures actual presence during the broadcast.
+model LiveRegistration {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveStreamId    String     @map("live_stream_id") @db.Uuid
+  liveStream      LiveStream @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
+  userId          String     @map("user_id") @db.Uuid
+  user            User       @relation(fields: [userId], references: [id])
+
+  registeredAt    DateTime   @default(now()) @map("registered_at") @db.Timestamptz()
+  /// Stamped when the "see you tomorrow" reminder is dispatched.
+  reminderSentAt  DateTime?  @map("reminder_sent_at") @db.Timestamptz()
+  /// User downloaded the .ics file or added to Google Calendar via OAuth.
+  calendarAdded   Boolean    @default(false) @map("calendar_added")
+
+  canceledAt      DateTime?  @map("canceled_at") @db.Timestamptz()
+
+  @@unique([liveStreamId, userId])
+  @@index([userId])
+  @@map("live_registrations")
+}
+
+/// Chapter marker on a recorded live stream. Lets the replay UI render
+/// "jump to: 00:12:34 — Why the BOJ blink mattered".
+model LiveRecordingChapter {
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveStreamId      String     @map("live_stream_id") @db.Uuid
+  liveStream        LiveStream @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
+
+  timestampSeconds  Int        @map("timestamp_seconds")
+  title             String
+  description       String?    @db.Text
+  sortOrder         Int        @default(0) @map("sort_order")
+
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@unique([liveStreamId, timestampSeconds])
+  @@index([liveStreamId, timestampSeconds])
+  @@map("live_recording_chapters")
+}
+
+// ============================================================================
+//  P1 · Platform settings (kv store for runtime-tunable knobs)
+//
+//  Things you DON'T want hard-coded: trial length in days, grace period,
+//  paywall preview word count, default reminder lead time, monthly newsletter
+//  cadence cap, etc. Edited via admin UI or direct SQL.
+// ============================================================================
+
+model PlatformSetting {
+  key            String   @id            // canonical dotted key, e.g. "subscription.trial_days"
+  valueJson      Json     @db.JsonB @map("value_json")
+
+  description    String?  @db.Text
+  updatedById    String?  @map("updated_by_id") @db.Uuid
+  updatedBy      User?    @relation("SettingUpdatedBy", fields: [updatedById], references: [id])
+
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("platform_settings")
+}
+
+// ============================================================================
+//  P1 · Daily aggregate metrics
+//
+//  Pre-aggregated rollups computed nightly from `article_views` /
+//  `podcast_listen_events`. After 90 days the raw event rows are
+//  truncated; these aggregates persist forever for historical reporting.
+// ============================================================================
+
+model ArticleDailyMetric {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId       String   @map("article_id") @db.Uuid
+  article         Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  /// Day boundary in UTC (midnight).
+  date            DateTime @db.Date
+
+  views               Int  @default(0)
+  uniqueViewers       Int  @default(0) @map("unique_viewers")
+  paywalledViews      Int  @default(0) @map("paywalled_views")
+  completions         Int  @default(0)
+  avgTimeSeconds      Int  @default(0) @map("avg_time_seconds")
+  bookmarkCount       Int  @default(0) @map("bookmark_count")
+  reactionCount       Int  @default(0) @map("reaction_count")
+  shareCount          Int  @default(0) @map("share_count")
+
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@unique([articleId, date])
+  @@index([date])
+  @@map("article_daily_metrics")
+}
+
+model PodcastEpisodeDailyMetric {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  episodeId         String         @map("episode_id") @db.Uuid
+  episode           PodcastEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  date              DateTime       @db.Date
+
+  plays                Int  @default(0)
+  uniqueListeners      Int  @default(0) @map("unique_listeners")
+  completions          Int  @default(0)
+  downloads            Int  @default(0)
+  avgListenSeconds     Int  @default(0) @map("avg_listen_seconds")
+
+  /// Distribution channel breakdown.
+  webPlays             Int  @default(0) @map("web_plays")
+  iosPlays             Int  @default(0) @map("ios_plays")
+  androidPlays         Int  @default(0) @map("android_plays")
+  applePodcastsPlays   Int  @default(0) @map("apple_podcasts_plays")
+  spotifyPlays         Int  @default(0) @map("spotify_plays")
+  otherPlays           Int  @default(0) @map("other_plays")
+
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@unique([episodeId, date])
+  @@index([date])
+  @@map("podcast_episode_daily_metrics")
+}
