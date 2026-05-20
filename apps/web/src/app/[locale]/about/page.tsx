@@ -1,13 +1,4 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Card } from "@aito/ui";
-import { Badge } from "@aito/ui";
-
-interface TeamMember {
-  name: string;
-  role: string;
-  bio: string;
-  flag?: string;
-}
 
 export default async function AboutPage({
   params,
@@ -17,7 +8,8 @@ export default async function AboutPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("about");
-  const team = t.raw("team") as TeamMember[];
+  const method = t.raw("method") as string[];
+  const coi = t.raw("coi") as string[];
 
   return (
     <main id="main" className="container mx-auto px-4 py-16 max-w-4xl">
@@ -33,28 +25,34 @@ export default async function AboutPage({
 
       <section className="mt-16">
         <h2 className="font-display text-3xl font-semibold text-fg">
-          {t("teamTitle")}
+          {t("methodTitle")}
         </h2>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {team.map((m) => (
-            <Card key={m.name} className="p-6 flex flex-col h-full">
-              <div className="flex items-center gap-3">
-                <div className="size-12 rounded-pill bg-fg-muted/15 grid place-items-center font-semibold text-fg">
-                  {m.name.split(" ").map((n) => n[0]).join("")}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-display text-lg font-semibold text-fg">
-                    {m.name}
-                  </div>
-                  <div className="text-sm text-fg-soft">{m.role}</div>
-                </div>
-                {m.flag && <Badge tone="gold">{m.flag}</Badge>}
-              </div>
-              <p className="mt-4 text-sm text-fg-muted leading-relaxed">{m.bio}</p>
-            </Card>
+        <ul className="mt-6 space-y-4 text-fg-muted leading-relaxed">
+          {method.map((p, i) => (
+            <li key={i}>{p}</li>
           ))}
-        </div>
+        </ul>
       </section>
+
+      <section className="mt-16">
+        <h2 className="font-display text-3xl font-semibold text-fg">
+          {t("coiTitle")}
+        </h2>
+        <ul className="mt-6 space-y-4 text-fg-muted leading-relaxed">
+          {coi.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="mt-16">
+        <h2 className="font-display text-3xl font-semibold text-fg">
+          {t("bridgeTitle")}
+        </h2>
+        <p className="mt-6 text-fg-muted leading-relaxed">{t("bridge")}</p>
+      </section>
+
+      <p className="mt-16 text-sm text-fg-soft">{t("contact")}</p>
     </main>
   );
 }

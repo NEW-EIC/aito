@@ -854,34 +854,7 @@
   "about": {
     "eyebrow": "About",
     "title": "A small editorial house, run by people who read both tapes.",
-    "lede": "We are not a guru, not a day-trading service, not an aggregator. We are five editors and a producer who think the next decade of investing requires reading two markets in two languages, with the same standards.",
-    "teamTitle": "The desk",
-    "team": [
-      {
-        "name": "Chris Pan",
-        "role": "Editor in Chief",
-        "bio": "Twenty years between an FX desk in Hong Kong and the editorial team at a US wire. Reads the Caixin briefing in the language it was published.",
-        "flag": "Founder"
-      },
-      {
-        "name": "Selina Wang",
-        "role": "Editor, Macro Desk",
-        "bio": "Rates and macro. Previously buy-side macro PM. Writes the Daily Pulse most mornings.",
-        "flag": ""
-      },
-      {
-        "name": "Bryan Lee",
-        "role": "Editor, Equities",
-        "bio": "Single names and capital structure. Ex-Bridgewater. Writes the long read every other Thursday.",
-        "flag": ""
-      },
-      {
-        "name": "Mei Zhao",
-        "role": "Editor, FX",
-        "bio": "Currencies and EM. Ex-Sequoia China. Writes the China Tape three days a week.",
-        "flag": ""
-      }
-    ],
+    "lede": "We are not a guru, not a day-trading service, not an aggregator. We are a small editorial house built on the belief that the next decade of investing requires reading two markets in two languages, with the same standards.",
     "methodTitle": "Methodology",
     "method": [
       "Every dated call carries a source, a date, and the criteria that would change our mind. We publish our misses with the same prominence as our hits.",
