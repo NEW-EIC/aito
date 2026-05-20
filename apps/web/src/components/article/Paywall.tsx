@@ -41,14 +41,14 @@ export function ArticlePaywall({ viewer, resource }: ArticlePaywallProps) {
         </h3>
         <p className="mt-3 text-fg-muted max-w-xl leading-relaxed">{t("sub")}</p>
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Link href="/signup">
+          <Link href="/sign-up">
             <Button size="lg">
               <Sparkles className="size-4" /> {t("cta")}
             </Button>
           </Link>
           <span className="text-sm text-fg-soft">
             {t("sub2")}{" "}
-            <Link href="/dashboard" className="text-fg underline-offset-4 hover:underline">
+            <Link href="/sign-in" className="text-fg underline-offset-4 hover:underline">
               {t("signin")}
             </Link>
           </span>

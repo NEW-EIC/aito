@@ -55,8 +55,9 @@ model User {
   timezone        String    @default("America/New_York")
   countryCode     String?   @map("country_code") // ISO-3166-1 alpha-2
 
-  // External identity provider (we don't store credentials)
-  authProvider       AuthProvider @default(logto) @map("auth_provider")
+  // External identity provider. `internal` = email/password handled by us
+  // (UserCredential row). OAuth values map to ExternalIdentity rows.
+  authProvider       AuthProvider @default(internal) @map("auth_provider")
   authProviderUserId String?      @map("auth_provider_user_id")
 
   // Marketing
@@ -108,6 +109,10 @@ model User {
   // Media assets uploaded by this user
   uploadedAssets              MediaAsset[]            @relation("MediaAssetUploader")
 
+  // Self-hosted auth (M1)
+  credential                  UserCredential?
+  authTokens                  AuthToken[]
+
   // P0+P1 additions
   notificationPreferences     NotificationPreference[]
   deviceTokens                DeviceToken[]
@@ -130,13 +135,97 @@ model User {
 }
 
 enum AuthProvider {
+  /// Email + password handled by our own server (UserCredential).
+  internal
+  /// Legacy values — kept for enum compat, not referenced in code.
   logto
   clerk
+  /// OAuth identity providers (also recorded in ExternalIdentity).
   google
   apple
+  github
   email_otp
 
   @@map("auth_provider")
+}
+
+/// Email/password credential. One row per User who signed up with internal
+/// auth. OAuth-only users do NOT have a row here.
+model UserCredential {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// argon2id hash of the password.
+  passwordHash    String   @map("password_hash")
+
+  /// Force password change on next login (admin reset).
+  mustChange      Boolean  @default(false) @map("must_change")
+
+  /// Last successful login. Stale rows = candidates for re-verification.
+  lastVerifiedAt  DateTime @default(now()) @map("last_verified_at") @db.Timestamptz()
+
+  /// Lockout state — after N failed attempts within M minutes. We track the
+  /// window's start so attempts older than the window roll off and don't
+  /// stack forever.
+  failedAttempts         Int       @default(0) @map("failed_attempts")
+  failedWindowStartedAt  DateTime? @map("failed_window_started_at") @db.Timestamptz()
+  lockedUntil            DateTime? @map("locked_until") @db.Timestamptz()
+
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("user_credentials")
+}
+
+/// Single-use tokens for verification flows: email verification, magic
+/// links, password reset, OTPs, MFA step-up. Never store the plaintext
+/// token — only sha256.
+model AuthToken {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// What kind of token. Determines validity window + delivery channel.
+  purpose       AuthTokenPurpose
+
+  /// sha256 of the opaque token sent to user. Never store plaintext.
+  tokenHash     String           @unique @map("token_hash")
+
+  /// FK — null for unauthenticated flows (signup email verification before
+  /// the User row exists). For password reset, points at the user.
+  userId        String?          @map("user_id") @db.Uuid
+  user          User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Identity claim we're verifying. For email verification = the new email.
+  /// For OTP = phone number. For password reset = email.
+  identifier    String           @db.Citext
+
+  /// For OTP / OTP-link: 6-8 digit code (also hashed). For magic link: null.
+  codeHash      String?          @map("code_hash")
+
+  /// Anti-replay: stamped on first successful redemption.
+  consumedAt    DateTime?        @map("consumed_at") @db.Timestamptz()
+
+  /// Anti-abuse counters.
+  attempts      Int              @default(0)
+
+  expiresAt     DateTime         @map("expires_at") @db.Timestamptz()
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([userId, purpose])
+  @@index([identifier, purpose])
+  @@index([expiresAt])
+  @@map("auth_tokens")
+}
+
+enum AuthTokenPurpose {
+  email_verification
+  password_reset
+  magic_link
+  email_otp
+  phone_otp
+  mfa_challenge
+
+  @@map("auth_token_purpose")
 }
 
 /// Server-validated session. If you adopt a stateless JWT-only auth,

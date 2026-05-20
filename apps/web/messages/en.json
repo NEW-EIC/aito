@@ -6,7 +6,10 @@
     "live": "Live",
     "community": "Community",
     "signin": "Sign in",
-    "cta": "Start 14-day trial"
+    "cta": "Start 14-day trial",
+    "account": "Account",
+    "dashboard": "Dashboard",
+    "signout": "Sign out"
   },
   "ticker": {
     "live": "LIVE",
@@ -850,6 +853,87 @@
     "logos": [
       "NYC · SF · HK · Shanghai · Singapore"
     ]
+  },
+  "auth": {
+    "signIn": {
+      "title": "Sign in",
+      "sub": "Welcome back.",
+      "email": "Email",
+      "emailPh": "you@firm.com",
+      "password": "Password",
+      "passwordPh": "Your password",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "forgot": "Forgot password?",
+      "or": "or",
+      "noAccount": "Don't have an account?",
+      "signUp": "Sign up"
+    },
+    "signUp": {
+      "title": "Create your account",
+      "sub": "Read tomorrow's brief before the cash open.",
+      "email": "Email",
+      "emailPh": "you@firm.com",
+      "password": "Password",
+      "passwordPh": "At least 10 characters",
+      "passwordHint": "At least 10 characters. Avoid passwords from public breaches.",
+      "confirm": "Confirm password",
+      "confirmPh": "Re-enter your password",
+      "agreeTerms": "I agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
+      "submit": "Continue",
+      "submitting": "Creating account…",
+      "haveAccount": "Already have an account?",
+      "signIn": "Sign in"
+    },
+    "verifyEmail": {
+      "title": "Verify your email",
+      "sub": "We sent a 6-digit code to {email}.",
+      "codeLabel": "Code",
+      "codePh": "123456",
+      "submit": "Verify",
+      "submitting": "Verifying…",
+      "resend": "Resend code",
+      "resent": "Code resent. Check your inbox.",
+      "wrongAddress": "Wrong address?"
+    },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "sub": "Enter the email you signed up with. We'll send a reset link.",
+      "email": "Email",
+      "emailPh": "you@firm.com",
+      "submit": "Send reset link",
+      "submitting": "Sending…",
+      "sentTitle": "Check your inbox",
+      "sentBody": "If {email} is registered with us, a reset link is on its way. The link expires in 1 hour.",
+      "sentNote": "Didn't get an email after a few minutes? You may not have an account yet.",
+      "createAccount": "Create one now",
+      "backToSignIn": "Back to sign in"
+    },
+    "resetPassword": {
+      "title": "Set a new password",
+      "sub": "Pick a fresh password. We'll sign you in once it's saved.",
+      "password": "New password",
+      "passwordPh": "At least 10 characters",
+      "confirm": "Confirm new password",
+      "confirmPh": "Re-enter your new password",
+      "submit": "Update password",
+      "submitting": "Saving…"
+    },
+    "errors": {
+      "invalidCredentials": "Incorrect email or password.",
+      "emailTaken": "An account with this email already exists.",
+      "weakPassword": "Pick a password not found in known data breaches.",
+      "tooShort": "Password must be at least 10 characters.",
+      "tooManyAttempts": "Too many failed attempts. Try again in {minutes} minutes.",
+      "invalidCode": "That code is incorrect or has expired.",
+      "expiredToken": "This link has expired. Request a new one.",
+      "invalidEmail": "Please enter a valid email address.",
+      "termsRequired": "You must agree to the Terms before continuing.",
+      "passwordsMismatch": "Passwords don't match.",
+      "rateLimited": "Too many requests. Slow down and try again in a minute.",
+      "unverified": "Please verify your email before signing in.",
+      "unknown": "Something went wrong. Please try again."
+    }
   },
   "about": {
     "eyebrow": "About",

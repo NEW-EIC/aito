@@ -1,12 +1,16 @@
-import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/routing";
 import { Logo } from "@aito/ui";
 import { Button } from "@aito/ui";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { ThemeToggle } from "./ThemeToggle";
+import { SignOutButton } from "./SignOutButton";
+import { getSessionFromCookie } from "@/lib/auth/session";
 
-export function Header() {
-  const t = useTranslations();
+export async function Header() {
+  const t = await getTranslations();
+  const session = await getSessionFromCookie();
+
   const nav = [
     { href: "/", labelKey: "nav.shows" },
     { href: "/pricing", labelKey: "nav.pricing" },
@@ -43,15 +47,29 @@ export function Header() {
         <div className="flex items-center gap-3">
           <LanguageSwitch className="hidden sm:inline-flex" />
           <ThemeToggle />
-          <Link
-            href="/dashboard"
-            className="hidden sm:inline-flex text-[17px] text-fg-muted hover:text-fg px-3"
-          >
-            {t("nav.signin")}
-          </Link>
-          <Link href="/signup">
-            <Button size="lg">{t("nav.cta")}</Button>
-          </Link>
+          {session ? (
+            <>
+              <Link
+                href="/dashboard"
+                className="hidden sm:inline-flex text-[17px] text-fg-muted hover:text-fg px-3"
+              >
+                {t("nav.dashboard")}
+              </Link>
+              <SignOutButton />
+            </>
+          ) : (
+            <>
+              <Link
+                href="/sign-in"
+                className="hidden sm:inline-flex text-[17px] text-fg-muted hover:text-fg px-3"
+              >
+                {t("nav.signin")}
+              </Link>
+              <Link href="/sign-up">
+                <Button size="lg">{t("nav.cta")}</Button>
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>

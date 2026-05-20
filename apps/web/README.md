@@ -81,6 +81,85 @@ Aim for ≥80% line coverage on `src/lib/domain/**` before Phase 1 W4.
 
 The translation file is the **only** place strings live. Components only call `t("namespace.key")`.
 
+## Auth
+
+Self-hosted, drop-in replacement for Clerk-style flows. All identity data
+lives in our own Postgres — no third-party identity provider.
+
+Implemented in Milestone 1:
+
+- Email + password sign-up with HaveIBeenPwned check
+- Email verification (6-digit OTP code OR magic link)
+- Sign-in with constant-time generic errors + account lockout after 5
+  failed attempts within a 15-minute window
+- Password reset via 1-hour single-use magic link (revokes all other
+  sessions on success)
+- Server-side session tokens (sha256 fingerprint in DB, opaque base32 in
+  cookie), 30-day lifetime with a 1-day sliding window
+- Per-IP rate limiting on every state-changing endpoint
+- Per-event audit log entry (signup, signin success/fail, signout,
+  email verification, password change, password reset, lockout)
+- `getViewer()` bridges the session into `@aito/domain`'s
+  `ViewerContext`, so the paywall in [`articles/[slug]/page.tsx`](src/app/[locale]/articles/[slug]/page.tsx)
+  applies real entitlement rules.
+
+### Local development
+
+```bash
+# 1. Start Postgres (if not already running)
+pnpm db:up
+
+# 2. Apply migrations + generate the Prisma client
+pnpm db:migrate
+
+# 3. Seed demo data — including three demo accounts (see below)
+pnpm db:seed
+
+# 4. Optional: drop a Resend key into .env.local — without one,
+#    verification + reset emails are printed to the dev console.
+cp apps/web/.env.example apps/web/.env.local
+
+# 5. Run the app
+pnpm web:dev
+```
+
+Open <http://localhost:3000/en/sign-in> and try one of:
+
+| Email                    | Password           | Tier    |
+| ------------------------ | ------------------ | ------- |
+| `demo-free@aito.io`      | `DemoFree2026!`    | free    |
+| `demo-premium@aito.io`   | `DemoPremium2026!` | premium |
+| `demo-pro@aito.io`       | `DemoPro2026!`     | pro     |
+
+The free demo user hits the paywall on `/en/articles/yield-curve-uninverted`;
+premium and pro users read through.
+
+### Tests
+
+```bash
+# Unit tests (crypto helpers + domain package)
+pnpm --filter @aito/web test
+pnpm test:domain
+
+# End-to-end (Playwright) — spins up `next dev` on port 3030 automatically
+pnpm --filter @aito/web exec playwright install chromium chromium-headless-shell
+pnpm --filter @aito/web test:e2e
+```
+
+Six e2e flows are covered: signup → verify → land on dashboard; tiered
+article unlock; account lockout after 5 wrong passwords; forgot-password
+→ reset → old session revoked; signout re-paywalls protected articles.
+
+### Production checklist
+
+- [ ] Resend domain (DKIM/SPF/DMARC) verified for `aito-alto.com`.
+- [ ] `RESEND_API_KEY` + `RESEND_FROM_EMAIL` set in Vercel.
+- [ ] `NEXT_PUBLIC_APP_URL` set to the canonical https URL.
+- [ ] HTTPS enforced (Vercel does this automatically).
+- [ ] In-memory rate limiter swapped for Upstash Redis if running >1
+      region (otherwise the 10/min IP gate is per-process).
+- [ ] Audit log retention policy set (6 months online, then S3 cold).
+
 ## Roadmap notes (matches CTO 24-week plan)
 
 - **W1–W3** — this scaffold. Investor demo. Zero cost.

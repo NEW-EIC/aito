@@ -24,8 +24,12 @@ import {
   MediaAssetKind,
   PermissionCategory,
   LegalDocumentKey,
+  AuthProvider,
+  BillingInterval,
+  SubscriptionState,
 } from "@prisma/client";
 import { createHash } from "node:crypto";
+import { hash as argon2Hash } from "@node-rs/argon2";
 
 const prisma = new PrismaClient();
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -410,6 +414,89 @@ async function main() {
       update: {},
       create: { key: s.key, valueJson: s.value as any, description: s.description },
     });
+  }
+
+  console.log("→ seeding demo auth users (free / premium / pro)");
+  const argonOpts = {
+    memoryCost: 19456,
+    timeCost: 2,
+    parallelism: 1,
+    outputLen: 32,
+  } as const;
+  const demoUsers = [
+    {
+      email: "demo-free@aito.io",
+      password: "DemoFree2026!",
+      plan: PlanKey.free,
+    },
+    {
+      email: "demo-premium@aito.io",
+      password: "DemoPremium2026!",
+      plan: PlanKey.premium,
+    },
+    {
+      email: "demo-pro@aito.io",
+      password: "DemoPro2026!",
+      plan: PlanKey.pro,
+    },
+  ];
+  for (const d of demoUsers) {
+    const passwordHash = await argon2Hash(d.password, argonOpts);
+    const user = await prisma.user.upsert({
+      where: { email: d.email },
+      update: {
+        emailVerifiedAt: new Date(),
+        authProvider: AuthProvider.internal,
+      },
+      create: {
+        email: d.email,
+        displayName: d.email.split("@")[0],
+        emailVerifiedAt: new Date(),
+        authProvider: AuthProvider.internal,
+      },
+    });
+    await prisma.userCredential.upsert({
+      where: { userId: user.id },
+      update: {
+        passwordHash,
+        failedAttempts: 0,
+        lockedUntil: null,
+        lastVerifiedAt: new Date(),
+        mustChange: false,
+      },
+      create: { userId: user.id, passwordHash },
+    });
+    // For premium / pro: ensure there's an active subscription. Free users
+    // don't get a Subscription row (free is the default state).
+    if (d.plan !== PlanKey.free) {
+      const plan = await prisma.plan.findUniqueOrThrow({ where: { key: d.plan } });
+      const existing = await prisma.subscription.findFirst({
+        where: {
+          userId: user.id,
+          state: {
+            in: [
+              SubscriptionState.trial,
+              SubscriptionState.active,
+              SubscriptionState.past_due,
+              SubscriptionState.grace_period,
+            ],
+          },
+        },
+      });
+      if (!existing) {
+        await prisma.subscription.create({
+          data: {
+            userId: user.id,
+            planId: plan.id,
+            state: SubscriptionState.active,
+            billingInterval: BillingInterval.monthly,
+            currentPeriodStart: new Date(),
+            currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            signupSource: "demo-seed",
+          },
+        });
+      }
+    }
   }
 
   console.log(`✓ seed complete. macro article: ${yieldArticle.slug}`);

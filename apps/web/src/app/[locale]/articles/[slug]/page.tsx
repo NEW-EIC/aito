@@ -1,7 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ArticlePaywall } from "@/components/article/Paywall";
 import { ChartPlaceholder } from "@/components/article/ChartPlaceholder";
-import type { ViewerContext } from "@aito/domain";
+import { getViewer } from "@/lib/auth/viewer";
 
 interface BodyBlock {
   type: "p" | "h2" | "chart";
@@ -20,13 +20,7 @@ export default async function ArticlePage({
   const byline = t.raw("byline") as { author: string; role: string; read: string };
   const body = t.raw("body") as BodyBlock[];
 
-  // PROTOTYPE: hard-coded "anonymous free viewer" so investors see the paywall fire.
-  // W4 replaces this with the real session lookup against the User table.
-  const viewer: ViewerContext = {
-    isAuthenticated: false,
-    tier: "free",
-    subscriptionState: null,
-  };
+  const viewer = await getViewer();
 
   return (
     <main id="main" className="container mx-auto px-4 py-14 max-w-article">

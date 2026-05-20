@@ -6,7 +6,10 @@
     "live": "直播課",
     "community": "社群",
     "signin": "登入",
-    "cta": "免費試讀 14 天"
+    "cta": "免費試讀 14 天",
+    "account": "帳戶",
+    "dashboard": "控制台",
+    "signout": "登出"
   },
   "ticker": {
     "live": "盤中",
@@ -850,6 +853,87 @@
     "logos": [
       "紐約 · 三藩市 · 香港 · 上海 · 新加坡"
     ]
+  },
+  "auth": {
+    "signIn": {
+      "title": "登入",
+      "sub": "歡迎回來。",
+      "email": "電郵",
+      "emailPh": "you@firm.com",
+      "password": "密碼",
+      "passwordPh": "你的密碼",
+      "submit": "登入",
+      "submitting": "登入中…",
+      "forgot": "忘記密碼？",
+      "or": "或",
+      "noAccount": "還未有帳戶？",
+      "signUp": "註冊"
+    },
+    "signUp": {
+      "title": "建立帳戶",
+      "sub": "明早開市前讀到我們的日報。",
+      "email": "電郵",
+      "emailPh": "you@firm.com",
+      "password": "密碼",
+      "passwordPh": "至少 10 位",
+      "passwordHint": "至少 10 位。避免在公開洩漏庫中出現過的密碼。",
+      "confirm": "再次輸入密碼",
+      "confirmPh": "請再輸入一次",
+      "agreeTerms": "我已閱讀並同意 <terms>服務條款</terms> 與 <privacy>私隱政策</privacy>。",
+      "submit": "繼續",
+      "submitting": "正在建立帳戶…",
+      "haveAccount": "已經有帳戶？",
+      "signIn": "登入"
+    },
+    "verifyEmail": {
+      "title": "驗證電郵",
+      "sub": "我們已向 {email} 寄出 6 位驗證碼。",
+      "codeLabel": "驗證碼",
+      "codePh": "123456",
+      "submit": "驗證",
+      "submitting": "驗證中…",
+      "resend": "重新發送",
+      "resent": "已重新發送，請查收。",
+      "wrongAddress": "電郵填錯了？"
+    },
+    "forgotPassword": {
+      "title": "重設密碼",
+      "sub": "輸入你註冊時使用的電郵，我們會寄一條重設連結給你。",
+      "email": "電郵",
+      "emailPh": "you@firm.com",
+      "submit": "發送重設連結",
+      "submitting": "發送中…",
+      "sentTitle": "請查收郵箱",
+      "sentBody": "如 {email} 已在我們這裡註冊，重設連結已寄出。連結 1 小時內有效。",
+      "sentNote": "幾分鐘後仍未收到？你可能還未有帳戶。",
+      "createAccount": "立即註冊",
+      "backToSignIn": "返回登入"
+    },
+    "resetPassword": {
+      "title": "設定新密碼",
+      "sub": "揀一個新密碼。儲存後我們會自動登入你。",
+      "password": "新密碼",
+      "passwordPh": "至少 10 位",
+      "confirm": "再次輸入新密碼",
+      "confirmPh": "請再輸入一次",
+      "submit": "更新密碼",
+      "submitting": "儲存中…"
+    },
+    "errors": {
+      "invalidCredentials": "電郵或密碼錯誤。",
+      "emailTaken": "該電郵已被註冊。",
+      "weakPassword": "請避免使用已知洩漏的密碼。",
+      "tooShort": "密碼至少需要 10 位。",
+      "tooManyAttempts": "失敗次數過多，請於 {minutes} 分鐘後再試。",
+      "invalidCode": "驗證碼錯誤或已過期。",
+      "expiredToken": "此連結已過期，請重新申請。",
+      "invalidEmail": "請輸入有效的電郵地址。",
+      "termsRequired": "請先勾選同意條款再繼續。",
+      "passwordsMismatch": "兩次輸入的密碼不一致。",
+      "rateLimited": "請求太頻繁，請稍候再試。",
+      "unverified": "請先完成電郵驗證再登入。",
+      "unknown": "出錯了，請稍候再試。"
+    }
   },
   "about": {
     "eyebrow": "關於",

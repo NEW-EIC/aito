@@ -9,7 +9,10 @@
   "exports": {
     ".": "./src/client.ts"
   },
-  "files": ["src", "prisma"],
+  "files": [
+    "src",
+    "prisma"
+  ],
   "scripts": {
     "db:up": "docker-compose up -d",
     "db:down": "docker-compose down",
@@ -33,6 +36,7 @@
   },
   "devDependencies": {
     "@aito/config": "workspace:*",
+    "@node-rs/argon2": "^2.0.2",
     "@prisma/internals": "5.22.0",
     "@types/node": "22.9.0",
     "prisma": "5.22.0",
