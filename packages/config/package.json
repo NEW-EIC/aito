@@ -11,5 +11,8 @@
   "exports": {
     "./tailwind-preset": "./tailwind/preset.ts",
     "./tsconfig/*": "./tsconfig/*"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.14"
   }
 }

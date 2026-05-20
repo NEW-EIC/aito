@@ -82,7 +82,11 @@ importers:
         specifier: 2.1.4
         version: 2.1.4(@types/node@22.9.0)
 
-  packages/config: {}
+  packages/config:
+    devDependencies:
+      tailwindcss:
+        specifier: 3.4.14
+        version: 3.4.14
 
   packages/database:
     dependencies:
