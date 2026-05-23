@@ -118,6 +118,49 @@ async function planForPriceId(priceId: string): Promise<{
   };
 }
 
+/** True if this event is older than the last one we processed for this
+ *  subscription. Stripe doesn't guarantee strict delivery order, so an
+ *  out-of-order `updated(active)` arriving after `payment_failed` would
+ *  flip us back to active if we didn't gate on this. */
+function isStaleEvent(
+  existingHighWater: Date | null | undefined,
+  eventCreatedAt: Date,
+): boolean {
+  if (!existingHighWater) return false;
+  return eventCreatedAt.getTime() < existingHighWater.getTime();
+}
+
+/** Derive the domain event that maps a Stripe status transition. Returns
+ *  null when there's no meaningful state change to drive through the
+ *  machine — e.g. a no-op metadata update. */
+function statusDeltaToDomainEvent(
+  prevStatus: Stripe.Subscription.Status | undefined,
+  newStatus: Stripe.Subscription.Status,
+): DomainEvent | null {
+  if (!prevStatus || prevStatus === newStatus) return null;
+  switch (newStatus) {
+    case "active":
+      // Could be trial.converted, payment.succeeded, or a recovery.
+      if (prevStatus === "trialing") return { type: "trial.converted" };
+      return { type: "payment.succeeded" };
+    case "past_due":
+      return { type: "payment.failed" };
+    case "unpaid":
+      // Stripe transitions past_due → unpaid when retries exhaust. Domain
+      // models this as the second payment.failed (active/past_due → grace).
+      return { type: "payment.failed" };
+    case "canceled":
+      return { type: "user.canceled" };
+    case "incomplete_expired":
+      return { type: "term.ended" };
+    case "trialing":
+      // Going *into* trial again from cancel/expired is "trial.started".
+      return { type: "trial.started" };
+    default:
+      return null;
+  }
+}
+
 /** Record the state change in subscription_events. Best-effort: failure
  *  to write the audit row should not abort the main transaction. */
 async function recordEvent(
@@ -141,10 +184,13 @@ async function recordEvent(
   });
 }
 
-/** Upsert the Subscription row for the given Stripe subscription. */
-async function upsertSubscription(
+/** Initial create. Seeds the row's starting state directly (the state
+ *  machine has no null→X edge). Only used on `customer.subscription.created`
+ *  and `checkout.session.completed` for first-time setups. */
+async function createSubscriptionFromStripe(
   sub: Stripe.Subscription,
   userId: string,
+  eventCreatedAt: Date,
 ): Promise<void> {
   const priceId = priceIdFromSub(sub);
   if (!priceId) {
@@ -157,7 +203,6 @@ async function upsertSubscription(
         `add it to PRICE_REGISTRY or seed the matching Plan row.`,
     );
   }
-
   const state = stripeStatusToState(sub.status);
   if (!state) {
     // incomplete / paused — wait for the next event.
@@ -170,6 +215,7 @@ async function upsertSubscription(
 
   await prisma.subscription.upsert({
     where: { stripeSubscriptionId: sub.id },
+    // create path: real initialisation.
     create: {
       userId,
       planId: planInfo.planId,
@@ -183,16 +229,55 @@ async function upsertSubscription(
       trialEndsAt: trialEnd ?? undefined,
       cancelAtPeriodEnd: sub.cancel_at_period_end,
       canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : undefined,
+      lastStripeEventAt: eventCreatedAt,
     },
+    // update path: the row already exists (e.g. checkout.session.completed
+    // ran first). Treat this as a sync — do NOT touch state directly; let
+    // the next status-change event drive the state machine.
     update: {
       planId: planInfo.planId,
       billingInterval: planInfo.interval,
-      state,
       currentPeriodStart: periodStart ?? undefined,
       currentPeriodEnd: periodEnd ?? undefined,
       trialEndsAt: trialEnd ?? undefined,
       cancelAtPeriodEnd: sub.cancel_at_period_end,
       canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
+      lastStripeEventAt: eventCreatedAt,
+    },
+  });
+}
+
+/** Sync non-state fields from a Stripe subscription onto the existing DB row.
+ *  Never writes `state` — that's the state machine's job. */
+async function syncSubscriptionFields(
+  sub: Stripe.Subscription,
+  eventCreatedAt: Date,
+): Promise<void> {
+  const priceId = priceIdFromSub(sub);
+  if (!priceId) return;
+  const planInfo = await planForPriceId(priceId);
+  if (!planInfo) {
+    throw new Error(
+      `Stripe subscription ${sub.id} references unknown price ${priceId}; ` +
+        `add it to PRICE_REGISTRY or seed the matching Plan row.`,
+    );
+  }
+
+  const periodStart = periodStartFromSub(sub);
+  const periodEnd = periodEndFromSub(sub);
+  const trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000) : null;
+
+  await prisma.subscription.update({
+    where: { stripeSubscriptionId: sub.id },
+    data: {
+      planId: planInfo.planId,
+      billingInterval: planInfo.interval,
+      currentPeriodStart: periodStart ?? undefined,
+      currentPeriodEnd: periodEnd ?? undefined,
+      trialEndsAt: trialEnd ?? undefined,
+      cancelAtPeriodEnd: sub.cancel_at_period_end,
+      canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
+      lastStripeEventAt: eventCreatedAt,
     },
   });
 }
@@ -253,6 +338,10 @@ async function applyTransition(
 
 // ─── Handlers ──────────────────────────────────────────────────────────────
 
+function eventCreatedDate(event: Stripe.Event): Date {
+  return new Date(event.created * 1000);
+}
+
 export async function handleCheckoutCompleted(event: Stripe.Event): Promise<void> {
   const session = event.data.object as Stripe.Checkout.Session;
   if (session.mode !== "subscription") return; // we only do recurring
@@ -281,7 +370,7 @@ export async function handleCheckoutCompleted(event: Stripe.Event): Promise<void
       ? session.subscription
       : session.subscription.id;
   const sub = await stripe.subscriptions.retrieve(subId);
-  await upsertSubscription(sub, user.id);
+  await createSubscriptionFromStripe(sub, user.id, eventCreatedDate(event));
 }
 
 export async function handleSubscriptionCreated(
@@ -297,7 +386,7 @@ export async function handleSubscriptionCreated(
       `customer.subscription.created: no user found for customer ${customerId}`,
     );
   }
-  await upsertSubscription(sub, user.id);
+  await createSubscriptionFromStripe(sub, user.id, eventCreatedDate(event));
 }
 
 export async function handleSubscriptionUpdated(
@@ -314,12 +403,69 @@ export async function handleSubscriptionUpdated(
     );
   }
 
-  // For `updated`, Stripe's status drift is the source of truth for the
-  // state column. The upsert handles plan / period / cancellation fields;
-  // it also overwrites state directly, which is fine because the only
-  // states upsert can land on are ones our state machine accepts as steady
-  // states (trial / active / past_due / canceled / expired).
-  await upsertSubscription(sub, user.id);
+  const eventCreatedAt = eventCreatedDate(event);
+  const existing = await prisma.subscription.findUnique({
+    where: { stripeSubscriptionId: sub.id },
+    select: { id: true, state: true, lastStripeEventAt: true },
+  });
+
+  // Race-condition guard: webhooks can arrive out of order. If a newer
+  // event already touched this subscription, drop the stale one.
+  if (existing && isStaleEvent(existing.lastStripeEventAt, eventCreatedAt)) {
+    console.warn(
+      `[stripe-webhook] dropping stale ${event.type} (${event.id}) ` +
+        `for ${sub.id}; event.created < lastStripeEventAt`,
+    );
+    return;
+  }
+
+  // First time we see this subscription via `updated` (shouldn't normally
+  // happen — `created` arrives first — but defend against it).
+  if (!existing) {
+    await createSubscriptionFromStripe(sub, user.id, eventCreatedAt);
+    return;
+  }
+
+  // Field sync (plan, period dates, cancellation flag) — but NOT state.
+  await syncSubscriptionFields(sub, eventCreatedAt);
+
+  // Derive a domain event from the Stripe status delta and run it through
+  // the state machine. previousAttributes carries Stripe's diff snapshot.
+  const previousAttributes = (
+    event.data as unknown as {
+      previous_attributes?: { status?: Stripe.Subscription.Status };
+    }
+  ).previous_attributes;
+  const domainEvent = statusDeltaToDomainEvent(
+    previousAttributes?.status,
+    sub.status,
+  );
+  if (!domainEvent) return;
+
+  try {
+    await applyTransition(
+      sub.id,
+      domainEvent,
+      event.id,
+      event.type,
+      event.data.object,
+    );
+  } catch (err) {
+    if (err instanceof IllegalTransitionError) {
+      // Audit the rejection and move on. The current DB state is the
+      // authority; the conflicting Stripe status is recorded for review.
+      await recordEvent(
+        existing.id,
+        existing.state,
+        existing.state,
+        event.id,
+        `${event.type}.illegal_transition`,
+        event.data.object,
+      );
+      throw err;
+    }
+    throw err;
+  }
 }
 
 export async function handleSubscriptionDeleted(
@@ -438,7 +584,19 @@ export async function handleInvoicePaymentSucceeded(
         event.data.object,
       );
     } catch (err) {
-      if (!(err instanceof IllegalTransitionError)) throw err;
+      if (err instanceof IllegalTransitionError) {
+        // Don't drop it on the floor — audit the conflict and rethrow so
+        // the webhook route marks the event permanent-failure for review.
+        await recordEvent(
+          dbSub.id,
+          dbSub.state,
+          dbSub.state,
+          event.id,
+          `${event.type}.illegal_transition`,
+          event.data.object,
+        );
+      }
+      throw err;
     }
   }
 }
@@ -493,8 +651,17 @@ export async function handleInvoicePaymentFailed(
         event.data.object,
       );
     } catch (err) {
-      if (!(err instanceof IllegalTransitionError)) throw err;
-      // Already past_due → grace_period → expired etc. — fine.
+      if (err instanceof IllegalTransitionError) {
+        await recordEvent(
+          dbSub.id,
+          dbSub.state,
+          dbSub.state,
+          event.id,
+          `${event.type}.illegal_transition`,
+          event.data.object,
+        );
+      }
+      throw err;
     }
   }
 }
