@@ -16,8 +16,12 @@ import {
 } from "./prices";
 import { env } from "@/lib/env";
 
+type StripeCheckoutLocale = NonNullable<
+  Parameters<typeof stripe.checkout.sessions.create>[0]
+>["locale"];
+
 /** Translate next-intl locales to Stripe's supported Checkout locales. */
-function stripeLocaleFor(appLocale: string): Stripe.Checkout.SessionCreateParams.Locale {
+function stripeLocaleFor(appLocale: string): StripeCheckoutLocale {
   switch (appLocale) {
     case "zh-CN":
       return "zh";
