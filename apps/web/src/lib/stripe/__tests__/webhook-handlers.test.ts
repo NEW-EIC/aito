@@ -26,6 +26,10 @@ vi.mock("@aito/database", () => {
         findUnique: vi.fn(),
         upsert: vi.fn(),
         update: vi.fn(),
+        // updateMany returns Prisma's BatchPayload { count }; tests can
+        // override per-call to simulate stale rejections.
+        updateMany: vi.fn(async () => ({ count: 1 })),
+        create: vi.fn(),
       },
       subscriptionEvent: {
         create: vi.fn(),
@@ -136,15 +140,19 @@ describe("handleCheckoutCompleted", () => {
       subscription: "sub_test_123",
       metadata: { userId: "user_test_123" },
     });
+    // The row does not yet exist → create path.
+    (prisma.subscription.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      null,
+    );
     await handleCheckoutCompleted(event);
 
-    expect(prisma.subscription.upsert).toHaveBeenCalledTimes(1);
-    const call = (prisma.subscription.upsert as ReturnType<typeof vi.fn>)
+    expect(prisma.subscription.create).toHaveBeenCalledTimes(1);
+    const call = (prisma.subscription.create as ReturnType<typeof vi.fn>)
       .mock.calls[0][0];
-    expect(call.where.stripeSubscriptionId).toBe("sub_test_123");
-    expect(call.create.userId).toBe("user_test_123");
-    expect(call.create.state).toBe("active");
-    expect(call.create.planId).toBe("plan_uuid_premium");
+    expect(call.data.userId).toBe("user_test_123");
+    expect(call.data.state).toBe("active");
+    expect(call.data.planId).toBe("plan_uuid_premium");
+    expect(call.data.lastStripeEventAt).toBeInstanceOf(Date);
   });
 
   it("falls back to metadata.userId and backfills the customer link", async () => {
@@ -159,6 +167,9 @@ describe("handleCheckoutCompleted", () => {
     });
     (stripe.subscriptions.retrieve as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeSubscription(),
+    );
+    (prisma.subscription.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      null,
     );
 
     const event = makeEvent("checkout.session.completed", {
@@ -181,7 +192,7 @@ describe("handleCheckoutCompleted", () => {
       customer: "cus_test_123",
     });
     await handleCheckoutCompleted(event);
-    expect(prisma.subscription.upsert).not.toHaveBeenCalled();
+    expect(prisma.subscription.create).not.toHaveBeenCalled();
   });
 
   it("throws permanent failure if the price id is not in the registry", async () => {
@@ -221,7 +232,7 @@ describe("handleCheckoutCompleted", () => {
 describe("handleSubscriptionCreated", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("upserts a Subscription with the Stripe-reported state", async () => {
+  it("creates a Subscription with the Stripe-reported state", async () => {
     (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: "user_test_123",
       email: "test@example.com",
@@ -229,11 +240,14 @@ describe("handleSubscriptionCreated", () => {
     (prisma.plan.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: "plan_uuid_premium",
     });
+    (prisma.subscription.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      null,
+    );
 
     await handleSubscriptionCreated(
       makeEvent("customer.subscription.created", makeSubscription()),
     );
-    expect(prisma.subscription.upsert).toHaveBeenCalledTimes(1);
+    expect(prisma.subscription.create).toHaveBeenCalledTimes(1);
   });
 
   it("maps Stripe `trialing` onto the domain trial state", async () => {
@@ -244,6 +258,9 @@ describe("handleSubscriptionCreated", () => {
     (prisma.plan.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: "plan_uuid_premium",
     });
+    (prisma.subscription.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      null,
+    );
 
     await handleSubscriptionCreated(
       makeEvent(
@@ -251,9 +268,9 @@ describe("handleSubscriptionCreated", () => {
         makeSubscription({ status: "trialing", trial_end: 1701000000 }),
       ),
     );
-    const call = (prisma.subscription.upsert as ReturnType<typeof vi.fn>)
+    const call = (prisma.subscription.create as ReturnType<typeof vi.fn>)
       .mock.calls[0][0];
-    expect(call.create.state).toBe("trial");
+    expect(call.data.state).toBe("trial");
   });
 });
 
@@ -465,13 +482,16 @@ describe("handleSubscriptionUpdated", () => {
     );
     await handleSubscriptionUpdated(event);
 
-    // Field sync (one update).
-    const updateCall = (prisma.subscription.update as ReturnType<typeof vi.fn>)
+    // Field sync now goes through updateMany (so the high-water predicate
+    // can ride on it). No state column written; no audit row written.
+    const updateCall = (prisma.subscription.updateMany as ReturnType<typeof vi.fn>)
       .mock.calls[0]?.[0];
     expect(updateCall).toBeDefined();
     expect(updateCall.data.state).toBeUndefined();
     expect(updateCall.data.cancelAtPeriodEnd).toBe(true);
-    // No state machine transition row.
+    expect(updateCall.data.lastStripeEventAt).toBeInstanceOf(Date);
+    // High-water guard rides on the where clause.
+    expect(updateCall.where.OR).toBeDefined();
     expect(prisma.subscriptionEvent.create).not.toHaveBeenCalled();
   });
 
@@ -553,5 +573,104 @@ describe("handleSubscriptionUpdated", () => {
     expect(auditCalls.some((c) => c[0]?.data?.eventType?.includes("illegal_transition"))).toBe(
       true,
     );
+  });
+});
+
+describe("late-arriving subscription.created", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("does not roll lastStripeEventAt backward when create-path runs against an existing row", async () => {
+    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "user_test_123",
+      email: "test@example.com",
+    });
+    (prisma.plan.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "plan_uuid_premium",
+    });
+    // Row already exists (e.g. updated arrived before created) with a
+    // newer high-water mark than the incoming create event.
+    (prisma.subscription.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "sub_db_uuid",
+      lastStripeEventAt: new Date(1700300000 * 1000),
+    });
+    // Simulate the high-water guard rejecting the update.
+    (prisma.subscription.updateMany as ReturnType<typeof vi.fn>).mockResolvedValue({
+      count: 0,
+    });
+
+    // event.created is OLDER than the existing high-water mark.
+    const event = makeEvent(
+      "customer.subscription.created",
+      makeSubscription(),
+      "evt_late_create",
+      { created: 1700200000 },
+    );
+    await handleSubscriptionCreated(event);
+
+    // updateMany was invoked, but with a where-clause that guards on
+    // lastStripeEventAt — so the row count of 0 reflects a no-op.
+    const call = (prisma.subscription.updateMany as ReturnType<typeof vi.fn>)
+      .mock.calls[0]?.[0];
+    expect(call).toBeDefined();
+    expect(call.where.OR).toBeDefined();
+    expect(call.where.OR[1].lastStripeEventAt.lte).toBeInstanceOf(Date);
+    // No create call (row already existed) and no state machine transition.
+    expect(prisma.subscription.create).not.toHaveBeenCalled();
+    expect(prisma.subscriptionEvent.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyTransition staleness guard", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("drops the transition when invoice.payment_failed arrives after a newer event", async () => {
+    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "user_test_123",
+      email: "test@example.com",
+    });
+    // Top-level findUnique for invoice handler.
+    (prisma.subscription.findUnique as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        id: "sub_db_uuid",
+        stripeSubscriptionId: "sub_test_123",
+        state: "active",
+        userId: "user_test_123",
+      })
+      // Second findUnique (inside applyTransition) — row carries a newer
+      // high-water mark than the incoming event.
+      .mockResolvedValueOnce({
+        id: "sub_db_uuid",
+        userId: "user_test_123",
+        state: "active",
+        lastStripeEventAt: new Date(1700500000 * 1000),
+      });
+
+    const event = makeEvent(
+      "invoice.payment_failed",
+      {
+        id: "in_stale_1",
+        customer: "cus_test_123",
+        amount_due: 2400,
+        amount_paid: 0,
+        currency: "usd",
+        created: 1700000000,
+        status_transitions: {},
+        total_taxes: [],
+        lines: {
+          data: [
+            { parent: { subscription_item_details: { subscription: "sub_test_123" } } },
+          ],
+        },
+      },
+      "evt_stale_invoice",
+      { created: 1700100000 },
+    );
+
+    // Should not throw — stale event is silently dropped.
+    await expect(handleInvoicePaymentFailed(event)).resolves.toBeUndefined();
+    // Invoice was still recorded (separate timestamp domain).
+    expect(prisma.invoice.upsert).toHaveBeenCalledTimes(1);
+    // But no state machine transition fired.
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });

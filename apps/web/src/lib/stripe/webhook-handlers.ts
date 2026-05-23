@@ -184,6 +184,28 @@ async function recordEvent(
   });
 }
 
+/** Conditionally update a subscription row only when the incoming Stripe
+ *  event is at-or-newer than the row's high-water mark. Returns true if the
+ *  update applied. Use this for *every* write driven by a Stripe event so
+ *  late-arriving payloads can't roll fields backward. */
+async function updateIfNotStale(
+  stripeSubscriptionId: string,
+  eventCreatedAt: Date,
+  data: Parameters<typeof prisma.subscription.updateMany>[0]["data"],
+): Promise<boolean> {
+  const res = await prisma.subscription.updateMany({
+    where: {
+      stripeSubscriptionId,
+      OR: [
+        { lastStripeEventAt: null },
+        { lastStripeEventAt: { lte: eventCreatedAt } },
+      ],
+    },
+    data: { ...data, lastStripeEventAt: eventCreatedAt },
+  });
+  return res.count > 0;
+}
+
 /** Initial create. Seeds the row's starting state directly (the state
  *  machine has no null→X edge). Only used on `customer.subscription.created`
  *  and `checkout.session.completed` for first-time setups. */
@@ -213,48 +235,66 @@ async function createSubscriptionFromStripe(
   const periodEnd = periodEndFromSub(sub);
   const trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000) : null;
 
-  await prisma.subscription.upsert({
+  // Existence check first so we can route create vs. (conditional) update
+  // independently. upsert() can't carry a where-predicate on the update
+  // branch — which is exactly what we need to guard the high water mark.
+  const existing = await prisma.subscription.findUnique({
     where: { stripeSubscriptionId: sub.id },
-    // create path: real initialisation.
-    create: {
-      userId,
-      planId: planInfo.planId,
-      state,
-      billingInterval: planInfo.interval,
-      stripeSubscriptionId: sub.id,
-      stripeCustomerId: typeof sub.customer === "string" ? sub.customer : sub.customer.id,
-      currentPeriodStart: periodStart ?? undefined,
-      currentPeriodEnd: periodEnd ?? undefined,
-      trialStartedAt: trialEnd ? new Date() : undefined,
-      trialEndsAt: trialEnd ?? undefined,
-      cancelAtPeriodEnd: sub.cancel_at_period_end,
-      canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : undefined,
-      lastStripeEventAt: eventCreatedAt,
-    },
-    // update path: the row already exists (e.g. checkout.session.completed
-    // ran first). Treat this as a sync — do NOT touch state directly; let
-    // the next status-change event drive the state machine.
-    update: {
-      planId: planInfo.planId,
-      billingInterval: planInfo.interval,
-      currentPeriodStart: periodStart ?? undefined,
-      currentPeriodEnd: periodEnd ?? undefined,
-      trialEndsAt: trialEnd ?? undefined,
-      cancelAtPeriodEnd: sub.cancel_at_period_end,
-      canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
-      lastStripeEventAt: eventCreatedAt,
-    },
+    select: { id: true, lastStripeEventAt: true },
   });
+
+  if (!existing) {
+    await prisma.subscription.create({
+      data: {
+        userId,
+        planId: planInfo.planId,
+        state,
+        billingInterval: planInfo.interval,
+        stripeSubscriptionId: sub.id,
+        stripeCustomerId:
+          typeof sub.customer === "string" ? sub.customer : sub.customer.id,
+        currentPeriodStart: periodStart ?? undefined,
+        currentPeriodEnd: periodEnd ?? undefined,
+        trialStartedAt: trialEnd ? new Date() : undefined,
+        trialEndsAt: trialEnd ?? undefined,
+        cancelAtPeriodEnd: sub.cancel_at_period_end,
+        canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : undefined,
+        lastStripeEventAt: eventCreatedAt,
+      },
+    });
+    return;
+  }
+
+  // Row already exists — e.g. checkout.session.completed ran first and a
+  // late customer.subscription.created arrived after. Treat as a field
+  // sync: do NOT touch state, and only write if we're not regressing the
+  // high water mark.
+  const applied = await updateIfNotStale(sub.id, eventCreatedAt, {
+    planId: planInfo.planId,
+    billingInterval: planInfo.interval,
+    currentPeriodStart: periodStart ?? undefined,
+    currentPeriodEnd: periodEnd ?? undefined,
+    trialEndsAt: trialEnd ?? undefined,
+    cancelAtPeriodEnd: sub.cancel_at_period_end,
+    canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
+  });
+  if (!applied) {
+    console.warn(
+      `[stripe-webhook] dropping stale create-path sync for ${sub.id}; ` +
+        `eventCreatedAt < lastStripeEventAt`,
+    );
+  }
 }
 
 /** Sync non-state fields from a Stripe subscription onto the existing DB row.
- *  Never writes `state` — that's the state machine's job. */
+ *  Never writes `state` — that's the state machine's job. Returns false if
+ *  the event was stale and the update was skipped. */
 async function syncSubscriptionFields(
   sub: Stripe.Subscription,
   eventCreatedAt: Date,
-): Promise<void> {
+): Promise<boolean> {
   const priceId = priceIdFromSub(sub);
-  if (!priceId) return;
+  if (!priceId) return false;
   const planInfo = await planForPriceId(priceId);
   if (!planInfo) {
     throw new Error(
@@ -267,31 +307,31 @@ async function syncSubscriptionFields(
   const periodEnd = periodEndFromSub(sub);
   const trialEnd = sub.trial_end ? new Date(sub.trial_end * 1000) : null;
 
-  await prisma.subscription.update({
-    where: { stripeSubscriptionId: sub.id },
-    data: {
-      planId: planInfo.planId,
-      billingInterval: planInfo.interval,
-      currentPeriodStart: periodStart ?? undefined,
-      currentPeriodEnd: periodEnd ?? undefined,
-      trialEndsAt: trialEnd ?? undefined,
-      cancelAtPeriodEnd: sub.cancel_at_period_end,
-      canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
-      lastStripeEventAt: eventCreatedAt,
-    },
+  return updateIfNotStale(sub.id, eventCreatedAt, {
+    planId: planInfo.planId,
+    billingInterval: planInfo.interval,
+    currentPeriodStart: periodStart ?? undefined,
+    currentPeriodEnd: periodEnd ?? undefined,
+    trialEndsAt: trialEnd ?? undefined,
+    cancelAtPeriodEnd: sub.cancel_at_period_end,
+    canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
   });
 }
 
 /** Apply a domain transition to an existing Subscription, persisting the
  *  resulting state. Throws IllegalTransitionError on a forbidden edge so
- *  the webhook surface logs it instead of silently dropping it. */
+ *  the webhook surface logs it instead of silently dropping it.
+ *
+ *  Returns false when the incoming event is staler than the row's high
+ *  water mark — the transition is skipped and no audit row is written. */
 async function applyTransition(
   stripeSubscriptionId: string,
   event: DomainEvent,
   externalEventId: string,
   stripeEventType: string,
   payload: unknown,
-): Promise<void> {
+  eventCreatedAt: Date,
+): Promise<boolean> {
   const current = await prisma.subscription.findUnique({
     where: { stripeSubscriptionId },
   });
@@ -299,6 +339,14 @@ async function applyTransition(
     throw new Error(
       `applyTransition: no Subscription row for ${stripeSubscriptionId}`,
     );
+  }
+
+  if (isStaleEvent(current.lastStripeEventAt, eventCreatedAt)) {
+    console.warn(
+      `[stripe-webhook] dropping stale ${stripeEventType} (${externalEventId}) ` +
+        `for ${stripeSubscriptionId}; event.created < lastStripeEventAt`,
+    );
+    return false;
   }
 
   const before = {
@@ -320,6 +368,7 @@ async function applyTransition(
         canceledAt: next.canceledAt ?? current.canceledAt,
         graceEndsAt: next.graceEndsAt ?? current.graceEndsAt,
         trialEndsAt: next.trialEndsAt ?? current.trialEndsAt,
+        lastStripeEventAt: eventCreatedAt,
       },
     }),
     prisma.subscriptionEvent.create({
@@ -334,6 +383,7 @@ async function applyTransition(
       },
     }),
   ]);
+  return true;
 }
 
 // ─── Handlers ──────────────────────────────────────────────────────────────
@@ -449,6 +499,7 @@ export async function handleSubscriptionUpdated(
       event.id,
       event.type,
       event.data.object,
+      eventCreatedAt,
     );
   } catch (err) {
     if (err instanceof IllegalTransitionError) {
@@ -495,6 +546,7 @@ export async function handleSubscriptionDeleted(
       event.id,
       event.type,
       event.data.object,
+      eventCreatedDate(event),
     );
   } catch (err) {
     if (err instanceof IllegalTransitionError) {
@@ -582,6 +634,7 @@ export async function handleInvoicePaymentSucceeded(
         event.id,
         event.type,
         event.data.object,
+        eventCreatedDate(event),
       );
     } catch (err) {
       if (err instanceof IllegalTransitionError) {
@@ -649,6 +702,7 @@ export async function handleInvoicePaymentFailed(
         event.id,
         event.type,
         event.data.object,
+        eventCreatedDate(event),
       );
     } catch (err) {
       if (err instanceof IllegalTransitionError) {
