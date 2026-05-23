@@ -36,6 +36,21 @@ const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
 async function main() {
   console.log("→ seeding plans");
+
+  // Wire Stripe price ids into the Plan rows. If you've filled in
+  // STRIPE_PRICE_* in apps/web/.env.local, those propagate here so paywall /
+  // billing flows can resolve "this Plan → which Stripe price". Otherwise
+  // fall back to clearly-fake placeholders so the seed remains idempotent
+  // and crash-free.
+  const stripePremiumMonthly =
+    process.env.STRIPE_PRICE_PREMIUM_MONTHLY ?? "price_seed_premium_monthly";
+  const stripePremiumYearly =
+    process.env.STRIPE_PRICE_PREMIUM_YEARLY ?? "price_seed_premium_yearly";
+  const stripeProMonthly =
+    process.env.STRIPE_PRICE_PRO_MONTHLY ?? "price_seed_pro_monthly";
+  const stripeProYearly =
+    process.env.STRIPE_PRICE_PRO_YEARLY ?? "price_seed_pro_yearly";
+
   await prisma.plan.upsert({
     where: { key: PlanKey.free },
     update: {},
@@ -58,13 +73,18 @@ async function main() {
 
   await prisma.plan.upsert({
     where: { key: PlanKey.premium },
-    update: {},
+    update: {
+      stripeMonthlyPriceId: stripePremiumMonthly,
+      stripeAnnualPriceId: stripePremiumYearly,
+    },
     create: {
       key: PlanKey.premium,
       name: "Premium",
       summary: "All newsletters + live replays + community.",
       monthlyPriceCents: 2400,
       annualPriceCents: 23900,
+      stripeMonthlyPriceId: stripePremiumMonthly,
+      stripeAnnualPriceId: stripePremiumYearly,
       features: {
         liveReplay: true,
         liveQA: false,
@@ -78,13 +98,18 @@ async function main() {
 
   await prisma.plan.upsert({
     where: { key: PlanKey.pro },
-    update: {},
+    update: {
+      stripeMonthlyPriceId: stripeProMonthly,
+      stripeAnnualPriceId: stripeProYearly,
+    },
     create: {
       key: PlanKey.pro,
       name: "Pro Desk",
       summary: "Live Q&A, model files, annual retreat.",
       monthlyPriceCents: 8400,
       annualPriceCents: 83900,
+      stripeMonthlyPriceId: stripeProMonthly,
+      stripeAnnualPriceId: stripeProYearly,
       features: {
         liveReplay: true,
         liveQA: true,
@@ -469,6 +494,16 @@ async function main() {
     // For premium / pro: ensure there's an active subscription. Free users
     // don't get a Subscription row (free is the default state).
     if (d.plan !== PlanKey.free) {
+      const fakeStripeCustomerId = `cus_demo_${d.plan}`;
+      const fakeStripeSubscriptionId = `sub_demo_${d.plan}`;
+
+      // Link a fake Stripe customer to the demo user. Webhooks won't fire
+      // against these ids in test mode — the seed is purely for UI screens.
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { stripeCustomerId: fakeStripeCustomerId },
+      });
+
       const plan = await prisma.plan.findUniqueOrThrow({ where: { key: d.plan } });
       const existing = await prisma.subscription.findFirst({
         where: {
@@ -493,6 +528,8 @@ async function main() {
             currentPeriodStart: new Date(),
             currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             signupSource: "demo-seed",
+            stripeCustomerId: fakeStripeCustomerId,
+            stripeSubscriptionId: fakeStripeSubscriptionId,
           },
         });
       }
