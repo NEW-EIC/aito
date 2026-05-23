@@ -51,15 +51,19 @@ export function PricingTable({ tiers, labels }: Props) {
     }
     setError(null);
     setPendingTier(tier);
+    let navigating = false;
     try {
       const res = await authFetch("/api/checkout", {
         body: { tier, interval },
       });
-      if (res.status === 401) {
+      if (res.status === 401 || res.status === 409) {
         const body = (await res.json().catch(() => ({}))) as {
           redirectTo?: string;
         };
-        router.push(body.redirectTo ?? "/sign-in?next=/pricing");
+        navigating = true;
+        router.push(
+          body.redirectTo ?? (res.status === 401 ? "/sign-in?next=/pricing" : "/dashboard/billing"),
+        );
         return;
       }
       if (!res.ok) {
@@ -72,14 +76,16 @@ export function PricingTable({ tiers, labels }: Props) {
         return;
       }
       // Full navigation: Stripe-hosted Checkout lives on a different origin.
+      navigating = true;
       startTransition(() => {
         window.location.assign(json.url!);
       });
     } catch {
       setError(labels.errorGeneric);
     } finally {
-      // Keep pendingTier set if we're navigating away; otherwise clear.
-      // The transition keeps the spinner up until the new page paints.
+      // Only keep the spinner up if we're actually navigating away;
+      // otherwise the buttons would stay disabled forever after an error.
+      if (!navigating) setPendingTier(null);
     }
   }
 

@@ -7,7 +7,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { prisma } from "@aito/database";
+import { prisma, SubscriptionState as DbSubscriptionState } from "@aito/database";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { verifyCsrf } from "@/lib/auth/csrf";
 import { getLocaleFromReferer } from "@/lib/auth/http";
@@ -20,6 +20,13 @@ const Body = z.object({
   tier: z.enum(["premium", "pro"]),
   interval: z.enum(["month", "year"]),
 });
+
+const ENTITLED_STATES: DbSubscriptionState[] = [
+  DbSubscriptionState.trial,
+  DbSubscriptionState.active,
+  DbSubscriptionState.past_due,
+  DbSubscriptionState.grace_period,
+];
 
 export async function POST(req: NextRequest) {
   const csrf = await verifyCsrf(req);
@@ -41,6 +48,28 @@ export async function POST(req: NextRequest) {
   }
   const { tier, interval } = parsed.data;
   const locale = await getLocaleFromReferer();
+
+  // Hard stop if this user already has an entitled subscription. Otherwise
+  // Stripe would happily create a second subscription (and charge the card)
+  // before our webhook caught up to find the DB-level partial unique index
+  // already in use. Send the client to the portal for plan changes.
+  const existing = await prisma.subscription.findFirst({
+    where: {
+      userId: current.user.id,
+      state: { in: ENTITLED_STATES },
+    },
+    include: { plan: true },
+  });
+  if (existing) {
+    return NextResponse.json(
+      {
+        error: "alreadySubscribed",
+        currentTier: existing.plan.key,
+        redirectTo: "/dashboard/billing",
+      },
+      { status: 409 },
+    );
+  }
 
   // Lazily create the Stripe Customer the first time this user checks out.
   // We persist the id back to `users.stripe_customer_id` so future checkouts
