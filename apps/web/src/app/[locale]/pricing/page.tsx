@@ -1,5 +1,9 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { PricingTier, type Tier } from "@/components/pricing/PricingTier";
+import {
+  PricingTable,
+  type PricingLabels,
+  type PricingTierData,
+} from "@/components/pricing/PricingTable";
 import { PricingComparison } from "@/components/pricing/PricingComparison";
 import { PricingFAQ } from "@/components/pricing/PricingFAQ";
 
@@ -11,7 +15,17 @@ export default async function PricingPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("pricing");
-  const tiers = t.raw("tiers") as Tier[];
+  const tiers = t.raw("tiers") as PricingTierData[];
+  const labels: PricingLabels = {
+    monthly: t("monthly"),
+    annual: t("annual"),
+    save: t("save"),
+    perMo: t("perMo"),
+    perYr: t("perYr"),
+    billed: t("billed"),
+    loading: t("loading"),
+    errorGeneric: t("errorGeneric"),
+  };
 
   return (
     <main id="main">
@@ -21,23 +35,10 @@ export default async function PricingPage({
             {t("title")}
           </h1>
           <p className="mt-5 lead">{t("sub")}</p>
-          <div className="mt-8 inline-flex items-center rounded-pill border border-border p-1 text-sm font-medium">
-            <span className="px-4 py-1.5 rounded-pill bg-fg text-bg">
-              {t("annual")} · {t("save")}
-            </span>
-            <span className="px-4 py-1.5 text-fg-soft">{t("monthly")}</span>
-          </div>
         </div>
 
-        <div className="mt-16 grid gap-6 md:grid-cols-3">
-          {tiers.map((tier) => (
-            <PricingTier
-              key={tier.name}
-              tier={tier}
-              perMo={t("perMo")}
-              billed={t("billed")}
-            />
-          ))}
+        <div className="mt-12">
+          <PricingTable tiers={tiers} labels={labels} />
         </div>
 
         <p className="mt-10 text-center text-xs text-fg-soft max-w-2xl mx-auto">

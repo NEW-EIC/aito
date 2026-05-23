@@ -118,11 +118,17 @@
     "annual": "Annual",
     "save": "Save 17%",
     "perMo": "/mo",
+    "perYr": "/yr",
     "billed": "billed annually",
+    "loading": "One moment…",
+    "errorGeneric": "Something went wrong. Please try again.",
     "tiers": [
       {
+        "tierKey": "free",
         "name": "Reader",
         "price": "$0",
+        "priceMonthly": "$0",
+        "priceYearly": "$0",
         "tagline": "The Friday brief, free for life.",
         "cta": "Subscribe free",
         "features": [
@@ -133,8 +139,11 @@
         ]
       },
       {
+        "tierKey": "premium",
         "name": "Premium",
         "price": "$24",
+        "priceMonthly": "$24",
+        "priceYearly": "$239",
         "tagline": "The daily pulse and the long read.",
         "cta": "Start 14-day trial",
         "popular": true,
@@ -147,8 +156,11 @@
         ]
       },
       {
+        "tierKey": "pro",
         "name": "Pro Desk",
         "price": "$84",
+        "priceMonthly": "$84",
+        "priceYearly": "$839",
         "tagline": "Plus China Tape, live, and the editor's notebook.",
         "cta": "Start 14-day trial",
         "features": [
@@ -279,6 +291,45 @@
         "caption": "2s10s spread, Jan 2024 → May 2026 (bps)"
       }
     ]
+  },
+  "checkout": {
+    "success": {
+      "title": "Welcome to the desk.",
+      "lede": "Your subscription is active. The next issue lands in your inbox at 07:00 ET.",
+      "confirming": "Confirming your subscription with our payment provider…",
+      "tier": "Tier",
+      "renews": "Next renewal",
+      "goToDashboard": "Go to dashboard",
+      "managePlan": "Manage billing"
+    },
+    "cancel": {
+      "title": "No charge was made.",
+      "lede": "You closed the checkout before completing it. Your card was never touched.",
+      "backToPricing": "Back to pricing",
+      "needHelp": "Have a question? Reply to any of our emails — a human reads them."
+    },
+    "billing": {
+      "title": "Billing",
+      "subTitle": "Manage your subscription, payment method, and invoices.",
+      "currentPlan": "Current plan",
+      "status": "Status",
+      "renews": "Renews",
+      "endsOn": "Access ends",
+      "noPlan": "You're on the free Reader tier.",
+      "pickPlan": "Pick a plan",
+      "manage": "Manage subscription",
+      "invoicesTitle": "Recent invoices",
+      "invoicesEmpty": "No invoices yet.",
+      "invoiceView": "View",
+      "states": {
+        "trial": "Trialing",
+        "active": "Active",
+        "past_due": "Past due",
+        "grace_period": "Grace period",
+        "canceled": "Canceled",
+        "expired": "Expired"
+      }
+    }
   },
   "paywall": {
     "eyebrow": "Premium · 4 of 12 paragraphs visible",
