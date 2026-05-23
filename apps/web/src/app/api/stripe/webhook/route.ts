@@ -60,28 +60,72 @@ export async function POST(req: NextRequest): Promise<Response> {
     return new Response("invalid signature", { status: 400 });
   }
 
-  // Idempotency gate: try to insert first. A unique-violation on
-  // (provider, external_event_id) means we've already processed this event.
+  // Idempotency gate. The only thing that means "fully processed, don't run
+  // again" is processedAt != null. A row with processedAt == null exists
+  // because a prior delivery crashed mid-handler — we must let the current
+  // delivery rerun dispatch, not silently ack.
+  //
+  // Stripe sequences retries (next attempt fires after the previous one
+  // returns), so the race window where two concurrent deliveries both see
+  // processedAt == null is small. If you ever observe duplicate writes from
+  // concurrent delivery, promote this to a pg_advisory_xact_lock keyed by
+  // event.id.
   try {
-    await prisma.webhookEvent.create({
-      data: {
-        provider: PROVIDER,
-        externalEventId: event.id,
-        eventType: event.type,
-        payload: event as unknown as Prisma.InputJsonValue,
+    // Insert-if-missing. We can't use upsert.update because that would
+    // clobber a successfully-processed row's failedAt/processedAt.
+    await prisma.webhookEvent
+      .create({
+        data: {
+          provider: PROVIDER,
+          externalEventId: event.id,
+          eventType: event.type,
+          payload: event as unknown as Prisma.InputJsonValue,
+        },
+      })
+      .catch((err) => {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002"
+        ) {
+          // Row already exists from a prior delivery attempt. That's fine —
+          // we'll check processedAt next.
+          return;
+        }
+        throw err;
+      });
+
+    const row = await prisma.webhookEvent.findUniqueOrThrow({
+      where: {
+        provider_externalEventId: {
+          provider: PROVIDER,
+          externalEventId: event.id,
+        },
       },
+      select: { processedAt: true },
     });
-  } catch (err) {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2002"
-    ) {
-      // Duplicate delivery — silently ack so Stripe stops retrying.
+    if (row.processedAt) {
       return new Response(JSON.stringify({ duplicate: true }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
     }
+
+    // Clear last failure markers and bump retry count atomically only when
+    // the row is still unprocessed. The `processedAt: null` predicate makes
+    // this a no-op if a concurrent worker just finished it.
+    await prisma.webhookEvent.updateMany({
+      where: {
+        provider: PROVIDER,
+        externalEventId: event.id,
+        processedAt: null,
+      },
+      data: {
+        failedAt: null,
+        failureMessage: null,
+        retryCount: { increment: 1 },
+      },
+    });
+  } catch (err) {
     // The DB itself is unhealthy. Let Stripe retry.
     console.error("[stripe-webhook] failed to record event", err);
     return new Response("db unavailable", { status: 500 });
@@ -104,6 +148,8 @@ export async function POST(req: NextRequest): Promise<Response> {
       `[stripe-webhook] handler failed for ${event.type} (${event.id})`,
       err,
     );
+    // retryCount was bumped by the upsert above; here we only stamp the
+    // failure markers so the next retry can decide whether to ack.
     await prisma.webhookEvent
       .update({
         where: {
@@ -112,7 +158,6 @@ export async function POST(req: NextRequest): Promise<Response> {
         data: {
           failedAt: new Date(),
           failureMessage: message.slice(0, 1024),
-          retryCount: { increment: 1 },
         },
       })
       .catch(() => {
