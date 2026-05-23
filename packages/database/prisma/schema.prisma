@@ -380,6 +380,11 @@ model Subscription {
   stripeSubscriptionId String? @unique @map("stripe_subscription_id")
   stripeCustomerId     String? @map("stripe_customer_id")
 
+  // High-water mark for out-of-order Stripe webhook delivery. Set to the
+  // `event.created` (UTC) of the most recent Stripe event we acted on for
+  // this subscription. Events with an older timestamp are dropped.
+  lastStripeEventAt    DateTime? @map("last_stripe_event_at") @db.Timestamptz()
+
   // Where the user signed up (homepage / article-cta / referral / ...)
   signupSource   String? @map("signup_source")
   // Referral attribution (denormalized for fast reads)
