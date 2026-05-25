@@ -46,7 +46,7 @@ export function PricingTable({ tiers, labels }: Props) {
 
   async function subscribe(tier: TierKey) {
     if (tier === "free") {
-      router.push("/signup");
+      router.push("/sign-up");
       return;
     }
     setError(null);
@@ -196,7 +196,7 @@ export function PricingTable({ tiers, labels }: Props) {
                 </button>
               ) : (
                 <Link
-                  href="/signup"
+                  href="/sign-up"
                   className={cn(
                     "mt-7 h-11 inline-flex items-center justify-center rounded-pill font-medium text-sm transition-colors w-full",
                     "border border-border bg-surface-sunk text-fg hover:bg-bg-alt",
