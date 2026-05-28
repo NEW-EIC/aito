@@ -100,9 +100,10 @@ it's in Phase A, deferred (Phase B+), or deliberately out
 |---|---|
 | Three tabs: EN / zh-CN / zh-HK | ✅ |
 | Each tab has independent title / subtitle / excerpt / body | ✅ |
-| English required before submit for review | ✅ |
-| Other locales optional (graceful when missing on public site) | ✅ |
-| "Copy from EN" button on zh-CN / zh-HK tabs (paste then translate) | ✅ |
+| **At least one language must be filled** (any of the three) | ✅ |
+| Public site renders gracefully when the visitor's locale is missing — falls back to whichever locale is filled | ✅ |
+| "Copy from another locale" button (pick source language, paste into current tab) | ✅ |
+| Slug input shown explicitly (auto-suggested from the first filled language's title, but editor can override) — falls back to `article-<6 char id>` when the first language is non-Latin and no manual slug is given | ✅ |
 | Per-translation "ready" flag (editor marks translation complete) | ⏳ Phase B |
 | Machine-translation assist | 🚫 docs/admin-backlog.md |
 
@@ -161,20 +162,25 @@ it's in Phase A, deferred (Phase B+), or deliberately out
 | Markdown source mode | ⏳ Phase B |
 | Side-by-side live preview | ⏳ Phase B |
 
-### 4. Editorial workflow (Day 9)
+### 4. Editorial workflow (Day 9 — slimmed)
+
+Direct-publish for Phase A. The full `in_review / legal_review /
+scheduled` workflow exists in the schema (and in the spec) but the
+admin UI doesn't surface it yet — editors hit Publish straight from
+draft. Saves ~1.5 days of UI work and the additional state-gate
+testing. Picked up in Phase B when there's a real editorial team
+that needs a second pair of eyes before things ship.
 
 | Feature | Phase A |
 |---|---|
-| State machine: `draft → in_review → published → archived` (4 of the spec's 6 states) | ✅ |
-| Submit for review (draft → in_review) | ✅ |
-| `/admin/reviews` queue: articles in_review assigned to me OR un-assigned | ✅ |
-| Review action: Approve / Request changes (with note) | ✅ |
-| `ArticleReview` row recorded; reviewedVersion locked to current translation version | ✅ |
-| Publish (in_review + approved review → published) | ✅ |
-| Edit-after-approval re-engages the review gate (stale review detection) | ✅ |
+| State machine: `draft → published → archived` (3 of the spec's 6 states) | ✅ |
+| Publish (draft → published) — editor clicks directly, no review gate | ✅ |
+| Unpublish back to draft (published → draft) for hot-fixes | ✅ |
 | Archive (published → archived; un-archive supported) | ✅ |
+| `in_review` state + `/admin/reviews` queue | ⏳ Phase B |
 | `legal_review` state (compliance flag) | ⏳ Phase B |
 | `scheduled` state (publish at a future timestamp) | ⏳ Phase B |
+| `ArticleReview` rows, edit-after-approval re-gate, reviewer notes | ⏳ Phase B |
 | Editor self-assigns to review queue | ⏳ Phase B |
 | Multi-stage review (e.g. editor → chief editor) | 🚫 docs/admin-backlog.md |
 
@@ -229,20 +235,19 @@ gets its own Phase B/C epic later.
 
 ---
 
-## Day-by-day target
+## Day-by-day target (9 days, slimmed from 10 after dropping review workflow)
 
 | Day | Slice | Closes |
 |---|---|---|
 | 1 | Staff auth helper, `/admin` shell, dashboard tiles, seed demo-admin | "Who can see /admin?" |
-| 2 | Article state machine in `@aito/domain` + unit tests | "What transitions are legal?" |
-| 3 | `/admin/articles` list (with status tabs, pagination) + new article action + audit log helper | "How do I make a draft?" |
-| 4 | `/admin/articles/[id]/edit`: metadata form + three-language tabs + placeholder textarea body | "How do I shape the article shell?" |
+| 2 | Article state machine in `@aito/domain` (3 states: draft / published / archived) + unit tests | "What transitions are legal?" |
+| 3 | `/admin/articles` list (status tabs, pagination, search box) + new article action + audit log helper | "How do I make a draft and find it again?" |
+| 4 | `/admin/articles/[id]/edit`: metadata form + three-language tabs (any-one required) + slug suggestion + placeholder textarea body | "How do I shape the article shell?" |
 | 5 | TipTap base + toolbar (formatting, headings, blocks, alignment, color, highlight) + autosave | "Can I write a paragraph?" |
 | 6 | Paste sanitisation (DOMPurify rules) + code block + font/spacing presets + first-line indent | "Does pasting from WeChat just work?" |
 | 7 | Image upload: Vercel Blob + drag + paste + caption + alignment + progress | "How do I add a screenshot?" |
-| 8 | HTML source toggle + preview tab + word count + reading time + Cmd+S shortcut | "Can I see what publishes?" |
-| 9 | Review queue + approve + publish + archive + zh-CN/zh-HK admin i18n | "Who clicks the green button?" |
-| 10 | E2E test + staging deploy + admin-runbook.md + admin-backlog.md | "Can a real editor use this?" |
+| 8 | HTML source toggle + preview tab + word count + reading time + Cmd+S shortcut + **Publish / Unpublish / Archive actions on edit page** | "Can I see what publishes — and click the green button?" |
+| 9 | zh-CN/zh-HK admin i18n + E2E playwright test + staging deploy + admin-runbook.md + admin-backlog.md | "Can a real editor use this?" |
 
 Each day's commit message starts with `feat(admin): day N — slice`.
 
@@ -313,6 +318,21 @@ Format each day:
   but the React docs are thinner. TipTap's `useEditor` hook +
   extension ecosystem ships faster, and the editor team behind
   it is responsive to issues.
+- **Scope adjustment after first review (same day):**
+  - Language requirement relaxed: *at least one* of EN / zh-CN /
+    zh-HK is required, not specifically English. Public site
+    falls back gracefully when the visitor's locale is missing
+    a translation. Brings a small slug-generation challenge
+    handled in §3a (auto-suggest from first filled language,
+    fallback to `article-<6 char id>` for non-Latin titles,
+    editor can always override).
+  - Review workflow cut: editors hit Publish directly from
+    draft. `in_review` / `legal_review` / `scheduled` states
+    stay in the schema and the `@aito/domain` state machine
+    leaves room for them — UI surfacing is Phase B. Saves
+    ~1 day of Day 9 work; freed time goes to article-list
+    search + zh admin i18n.
+  - Project shrinks from 10 days to 9.
 
 **Carry-over**
 
