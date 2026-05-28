@@ -6,6 +6,11 @@ in this repo. Read this before touching anything in
 
 ---
 
+> **Deploying to Vercel / switching to Live mode?** See the separate
+> [deployment runbook](./deployment-runbook.md) — it covers Postgres
+> provisioning, env vars on Vercel, the migration-on-deploy hook, and
+> the Test → Live switchover checklist.
+
 ## One-time Stripe Dashboard setup
 
 The dashboard side is **not** code-managed. Do it once per environment
