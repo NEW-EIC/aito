@@ -6,7 +6,7 @@ import { useRouter } from "@/i18n/routing";
 import { Button } from "@aito/ui";
 import { Link } from "@/i18n/routing";
 import { authFetch } from "@/lib/auth/csrfClient";
-import { sanitizeRedirectTo } from "@/lib/auth/safeRedirect";
+import { sanitizeRedirectTo, stripLocale } from "@/lib/auth/safeRedirect";
 import { AuthInput } from "./AuthInput";
 
 interface SignInFormProps {
@@ -44,7 +44,9 @@ export function SignInForm({ redirectTo }: SignInFormProps) {
         }
         return;
       }
-      router.push(sanitizeRedirectTo(redirectTo));
+      // next-intl's router auto-prefixes the locale. Strip any locale that's
+      // already on the redirectTo so we don't end up at /zh-CN/zh-CN/...
+      router.push(stripLocale(sanitizeRedirectTo(redirectTo)));
       router.refresh();
     } catch {
       setError(tErr("unknown"));
