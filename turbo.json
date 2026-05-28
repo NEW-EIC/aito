@@ -5,7 +5,23 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
-      "env": ["DATABASE_URL", "DIRECT_DATABASE_URL", "PII_ENCRYPTION_KEY", "STRIPE_SECRET_KEY"]
+      "env": [
+        "NODE_ENV",
+        "NEXT_PUBLIC_APP_URL",
+        "SESSION_SECRET",
+        "DATABASE_URL",
+        "DIRECT_DATABASE_URL",
+        "PII_ENCRYPTION_KEY",
+        "RESEND_API_KEY",
+        "RESEND_FROM_EMAIL",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_PUBLISHABLE_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "STRIPE_PRICE_PREMIUM_MONTHLY",
+        "STRIPE_PRICE_PREMIUM_YEARLY",
+        "STRIPE_PRICE_PRO_MONTHLY",
+        "STRIPE_PRICE_PRO_YEARLY"
+      ]
     },
     "dev": {
       "cache": false,

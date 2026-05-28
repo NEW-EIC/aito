@@ -68,6 +68,9 @@ importers:
       resend:
         specifier: ^6.12.3
         version: 6.12.3(@react-email/render@2.0.8(react-dom@19.0.0-rc-66855b96-20241106(react@19.0.0-rc-66855b96-20241106))(react@19.0.0-rc-66855b96-20241106))
+      stripe:
+        specifier: ^22.1.1
+        version: 22.1.1(@types/node@22.9.0)
       tailwind-merge:
         specifier: 2.5.4
         version: 2.5.4
@@ -2410,6 +2413,15 @@ packages:
     resolution: {integrity: sha512-vavAMRXOgBVNF6nyEEmL3DBK19iRpDcoIwW+swQ+CbGiu7lju6t+JklA1MHweoWtadgt4ISVUsXLyDq34ddcwA==}
     engines: {node: '>=4'}
 
+  stripe@22.1.1:
+    resolution: {integrity: sha512-cmodIYP27tBkJ8G7DuGgWw0PFuemlFZbuF3Wwr1TrjFjUa3T7NIgCe6TVwX8BO2ynu+xtTuDGfHafNDCPt9lXA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@types/node': '>=18'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+
   stubborn-fs@2.0.0:
     resolution: {integrity: sha512-Y0AvSwDw8y+nlSNFXMm2g6L51rBGdAQT20J3YSOqxC53Lo3bjWRtr2BKcfYoAf352WYpsZSTURrA0tqhfgudPA==}
 
@@ -4597,6 +4609,10 @@ snapshots:
   streamsearch@1.1.0: {}
 
   strip-bom@3.0.0: {}
+
+  stripe@22.1.1(@types/node@22.9.0):
+    optionalDependencies:
+      '@types/node': 22.9.0
 
   stubborn-fs@2.0.0:
     dependencies:

@@ -5,7 +5,7 @@
   "description": "AITO · Alto web app — Next.js 15 + TS + Tailwind + next-intl.",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -30,6 +30,7 @@
     "react-dom": "19.0.0-rc-66855b96-20241106",
     "react-email": "^6.1.5",
     "resend": "^6.12.3",
+    "stripe": "^22.1.1",
     "tailwind-merge": "2.5.4",
     "zod": "^4.4.3"
   },

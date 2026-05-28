@@ -31,3 +31,24 @@ export function withLocale(path: string, locale: string): string {
   if (path === "/") return `/${locale}`;
   return `/${locale}${path}`;
 }
+
+/**
+ * Inverse of `withLocale`. Strip a leading `/{locale}/` segment if present
+ * so the path is safe to feed into next-intl's `router.push`, which adds
+ * the locale automatically. Without this, a redirectTo that already carries
+ * the locale prefix double-prefixes to `/zh-CN/zh-CN/...`.
+ *
+ * The locale list must match the one in `apps/web/src/i18n/routing.ts`.
+ */
+const KNOWN_LOCALES = ["en", "zh-CN", "zh-HK"] as const;
+
+export function stripLocale(path: string): string {
+  if (!path.startsWith("/")) return path;
+  for (const locale of KNOWN_LOCALES) {
+    if (path === `/${locale}`) return "/";
+    if (path.startsWith(`/${locale}/`)) {
+      return path.slice(`/${locale}`.length);
+    }
+  }
+  return path;
+}

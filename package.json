@@ -11,10 +11,12 @@
     "test:domain": "pnpm --filter @aito/domain test",
     "db:up": "pnpm --filter @aito/database db:up",
     "db:migrate": "pnpm --filter @aito/database prisma:migrate",
+    "db:migrate:deploy": "pnpm --filter @aito/database prisma:migrate:deploy",
     "db:studio": "pnpm --filter @aito/database prisma:studio",
     "db:seed": "pnpm --filter @aito/database prisma:seed",
     "web:dev": "pnpm --filter @aito/web dev",
     "web:build": "pnpm --filter @aito/web build",
+    "vercel-build": "pnpm --filter @aito/database prisma:generate && pnpm db:migrate:deploy && pnpm --filter @aito/web build",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css}\" --ignore-path .gitignore"
   },
   "devDependencies": {

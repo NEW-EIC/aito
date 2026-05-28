@@ -101,6 +101,32 @@ Vercel auto-detects monorepos when you point it at the right app:
 5. **Output Directory**: `.next`
 6. Add env vars: `DATABASE_URL`, `DIRECT_DATABASE_URL`, `STRIPE_*` (W4+)
 
+## Stripe
+
+Subscription checkout, webhooks, and the customer portal are wired
+through Stripe (test mode). Required env vars (in `apps/web/.env.local`,
+template in `apps/web/.env.example`):
+
+```
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...          # from `stripe listen` for local dev
+STRIPE_PRICE_PREMIUM_MONTHLY=price_...
+STRIPE_PRICE_PREMIUM_YEARLY=price_...
+STRIPE_PRICE_PRO_MONTHLY=price_...
+STRIPE_PRICE_PRO_YEARLY=price_...
+```
+
+Local webhook forwarding:
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+# Paste the printed whsec_... into STRIPE_WEBHOOK_SECRET, then restart web:dev.
+```
+
+Full runbook (Dashboard setup, test cards, troubleshooting): see
+[docs/stripe-runbook.md](docs/stripe-runbook.md).
+
 ## Migration notes
 
 This repo was migrated from a flat single-app structure on May 18, 2026. The old paths still resolve through deprecated shim re-exports:

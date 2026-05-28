@@ -118,11 +118,17 @@
     "annual": "按年",
     "save": "省 17%",
     "perMo": "/月",
+    "perYr": "/年",
     "billed": "按年結算",
+    "loading": "請稍候…",
+    "errorGeneric": "出咗啲問題,請再試一次。",
     "tiers": [
       {
+        "tierKey": "free",
         "name": "Reader",
         "price": "$0",
+        "priceMonthly": "$0",
+        "priceYearly": "$0",
         "tagline": "每週五的免費簡報,長期免費。",
         "cta": "免費訂閱",
         "features": [
@@ -133,8 +139,11 @@
         ]
       },
       {
+        "tierKey": "premium",
         "name": "Premium",
         "price": "$24",
+        "priceMonthly": "$24",
+        "priceYearly": "$239",
         "tagline": "每日脈搏與週度長文。",
         "cta": "免費試讀 14 天",
         "popular": true,
@@ -147,8 +156,11 @@
         ]
       },
       {
+        "tierKey": "pro",
         "name": "Pro Desk",
         "price": "$84",
+        "priceMonthly": "$84",
+        "priceYearly": "$839",
         "tagline": "加上 Caixin 通訊、直播課與編輯筆記。",
         "cta": "免費試讀 14 天",
         "features": [
@@ -279,6 +291,45 @@
         "caption": "2 年 / 10 年期利差,2024 年 1 月 — 2026 年 5 月(基點)"
       }
     ]
+  },
+  "checkout": {
+    "success": {
+      "title": "歡迎加入編輯台。",
+      "lede": "你嘅訂閱已經生效。下一期會喺 ET 朝早 7 點準時寄到你郵箱。",
+      "confirming": "正在同支付服務商核實你嘅訂閱…",
+      "tier": "套餐",
+      "renews": "下次續費",
+      "goToDashboard": "去個人中心",
+      "managePlan": "管理賬單"
+    },
+    "cancel": {
+      "title": "未有扣款。",
+      "lede": "你喺完成付款之前已經離開,我哋無碌過你張卡。",
+      "backToPricing": "返去價錢頁",
+      "needHelp": "有問題?直接回覆我哋任何一封郵件,呢邊係真人睇。"
+    },
+    "billing": {
+      "title": "賬單",
+      "subTitle": "管理你嘅訂閱、付款方式同發票。",
+      "currentPlan": "目前套餐",
+      "status": "狀態",
+      "renews": "續費日",
+      "endsOn": "服務到期",
+      "noPlan": "你目前係免費讀者檔。",
+      "pickPlan": "揀套餐",
+      "manage": "管理訂閱",
+      "invoicesTitle": "近期發票",
+      "invoicesEmpty": "暫時未有發票。",
+      "invoiceView": "查看",
+      "states": {
+        "trial": "試用中",
+        "active": "生效中",
+        "past_due": "已逾期",
+        "grace_period": "寬限期",
+        "canceled": "已取消",
+        "expired": "已到期"
+      }
+    }
   },
   "paywall": {
     "eyebrow": "Premium · 已顯示 12 段中的 4 段",

@@ -41,7 +41,7 @@ export function Hero() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
-          <Link href="/signup">
+          <Link href="/sign-up">
             <Button size="lg">
               {t("cta1")} <ArrowRight className="size-4" />
             </Button>

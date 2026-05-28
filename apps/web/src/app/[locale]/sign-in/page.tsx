@@ -18,11 +18,13 @@ export default async function SignInPage({
   const { redirectTo: rawRedirectTo } = await searchParams;
   setRequestLocale(locale);
 
-  const safeRedirectTo = withLocale(sanitizeRedirectTo(rawRedirectTo), locale);
+  // Locale-less path is what next-intl's client-side router expects (SignInForm).
+  // For the server-side `redirect()` below, we need the locale-prefixed form.
+  const safeRedirectTo = sanitizeRedirectTo(rawRedirectTo);
 
   // Already signed in? Go straight through.
   const current = await getSessionFromCookie();
-  if (current) redirect(safeRedirectTo);
+  if (current) redirect(withLocale(safeRedirectTo, locale));
 
   const t = await getTranslations("auth.signIn");
 

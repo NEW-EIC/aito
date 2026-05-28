@@ -24,6 +24,11 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
+  // `native` covers the dev box (Darwin / Linux). `rhel-openssl-3.0.x` is
+  // what Vercel's Node 20 serverless runtime needs — without this, Next's
+  // bundler can't find the query engine binary at request time and every
+  // DB call throws PrismaClientInitializationError.
+  binaryTargets   = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -47,13 +52,13 @@ model User {
   phone           String?
   phoneVerifiedAt DateTime? @map("phone_verified_at") @db.Timestamptz()
 
-  displayName     String?   @map("display_name")
-  avatarAssetId   String?   @map("avatar_asset_id") @db.Uuid
-  avatar          MediaAsset? @relation("UserAvatar", fields: [avatarAssetId], references: [id])
+  displayName   String?     @map("display_name")
+  avatarAssetId String?     @map("avatar_asset_id") @db.Uuid
+  avatar        MediaAsset? @relation("UserAvatar", fields: [avatarAssetId], references: [id])
 
-  preferredLocale Locale    @default(en) @map("preferred_locale")
-  timezone        String    @default("America/New_York")
-  countryCode     String?   @map("country_code") // ISO-3166-1 alpha-2
+  preferredLocale Locale  @default(en) @map("preferred_locale")
+  timezone        String  @default("America/New_York")
+  countryCode     String? @map("country_code") // ISO-3166-1 alpha-2
 
   // External identity provider. `internal` = email/password handled by us
   // (UserCredential row). OAuth values map to ExternalIdentity rows.
@@ -61,73 +66,77 @@ model User {
   authProviderUserId String?      @map("auth_provider_user_id")
 
   // Marketing
-  marketingOptInAt   DateTime? @map("marketing_opt_in_at") @db.Timestamptz()
+  marketingOptInAt DateTime? @map("marketing_opt_in_at") @db.Timestamptz()
+
+  // Stripe customer linkage. One Stripe Customer per User, lazily created on
+  // first checkout. Webhook handlers look users up by this id.
+  stripeCustomerId String? @unique @map("stripe_customer_id")
 
   // Lifecycle
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz()
-  lastSeenAt      DateTime? @map("last_seen_at") @db.Timestamptz()
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz()
+  lastSeenAt DateTime? @map("last_seen_at") @db.Timestamptz()
 
   // Relations
-  sessions                    Session[]
-  externalIdentities          ExternalIdentity[]
-  subscriptions               Subscription[]
-  paymentMethods              PaymentMethod[]
-  payments                    Payment[]
-  invoices                    Invoice[]
-  kycVerifications            KycVerification[]
-  imMemberships               ImMembership[]
-  liveAttendances             LiveAttendance[]
-  newsletterSubscriptions     NewsletterSubscription[]
-  ownedReferralCodes          ReferralCode[]          @relation("ReferralCodeOwner")
-  attributionsAsReferer       ReferralAttribution[]   @relation("Referer")
-  attributionsAsReferee       ReferralAttribution[]   @relation("Referee")
-  auditLogEntries             AuditLogEntry[]
+  sessions                Session[]
+  externalIdentities      ExternalIdentity[]
+  subscriptions           Subscription[]
+  paymentMethods          PaymentMethod[]
+  payments                Payment[]
+  invoices                Invoice[]
+  kycVerifications        KycVerification[]
+  imMemberships           ImMembership[]
+  liveAttendances         LiveAttendance[]
+  newsletterSubscriptions NewsletterSubscription[]
+  ownedReferralCodes      ReferralCode[]           @relation("ReferralCodeOwner")
+  attributionsAsReferer   ReferralAttribution[]    @relation("Referer")
+  attributionsAsReferee   ReferralAttribution[]    @relation("Referee")
+  auditLogEntries         AuditLogEntry[]
 
   // RBAC / staff
-  staffProfile                StaffProfile?
-  userRoles                   UserRole[]              @relation("UserRoleHolder")
-  grantedRoles                UserRole[]              @relation("UserRoleGrantedBy")
+  staffProfile StaffProfile?
+  userRoles    UserRole[]    @relation("UserRoleHolder")
+  grantedRoles UserRole[]    @relation("UserRoleGrantedBy")
 
   // Behavior + bookmarks
-  articleViews                ArticleView[]
-  articleReadProgress         ArticleReadProgress[]
-  podcastListenEvents         PodcastListenEvent[]
-  podcastListenProgress       PodcastListenProgress[]
-  contentBookmarks            ContentBookmark[]
-  contentReactions            ContentReaction[]
-  contentShares               ContentShare[]
-  searchQueries               SearchQueryLog[]
+  articleViews          ArticleView[]
+  articleReadProgress   ArticleReadProgress[]
+  podcastListenEvents   PodcastListenEvent[]
+  podcastListenProgress PodcastListenProgress[]
+  contentBookmarks      ContentBookmark[]
+  contentReactions      ContentReaction[]
+  contentShares         ContentShare[]
+  searchQueries         SearchQueryLog[]
 
   // Content authorship audit
-  articleRevisionsEdited      ArticleTranslationRevision[]
+  articleRevisionsEdited ArticleTranslationRevision[]
 
   // Legal acceptance
-  legalAcceptances            UserLegalAcceptance[]
+  legalAcceptances UserLegalAcceptance[]
 
   // Media assets uploaded by this user
-  uploadedAssets              MediaAsset[]            @relation("MediaAssetUploader")
+  uploadedAssets MediaAsset[] @relation("MediaAssetUploader")
 
   // Self-hosted auth (M1)
-  credential                  UserCredential?
-  authTokens                  AuthToken[]
+  credential UserCredential?
+  authTokens AuthToken[]
 
   // P0+P1 additions
   notificationPreferences     NotificationPreference[]
   deviceTokens                DeviceToken[]
   mfaFactors                  UserMfaFactor[]
-  apiTokensCreated            ApiToken[]              @relation("ApiTokenCreator")
+  apiTokensCreated            ApiToken[]               @relation("ApiTokenCreator")
   couponRedemptions           CouponRedemption[]
   accountCredit               AccountCredit?
-  accountCreditEntriesGranted AccountCreditEntry[]    @relation("CreditEntryGranter")
-  payoutsReceived             Payout[]                @relation("PayoutRecipient")
-  giftsPurchased              GiftSubscription[]      @relation("GiftPurchaser")
-  giftsReceived               GiftSubscription[]      @relation("GiftRecipient")
+  accountCreditEntriesGranted AccountCreditEntry[]     @relation("CreditEntryGranter")
+  payoutsReceived             Payout[]                 @relation("PayoutRecipient")
+  giftsPurchased              GiftSubscription[]       @relation("GiftPurchaser")
+  giftsReceived               GiftSubscription[]       @relation("GiftRecipient")
   liveRegistrations           LiveRegistration[]
-  reviewsPerformed            ArticleReview[]         @relation("ArticleReviewer")
-  erratumsPosted              ArticleErratum[]        @relation("ErratumPostedBy")
-  platformSettingsUpdated     PlatformSetting[]       @relation("SettingUpdatedBy")
+  reviewsPerformed            ArticleReview[]          @relation("ArticleReviewer")
+  erratumsPosted              ArticleErratum[]         @relation("ErratumPostedBy")
+  platformSettingsUpdated     PlatformSetting[]        @relation("SettingUpdatedBy")
 
   @@unique([authProvider, authProviderUserId])
   @@index([deletedAt])
@@ -152,28 +161,28 @@ enum AuthProvider {
 /// Email/password credential. One row per User who signed up with internal
 /// auth. OAuth-only users do NOT have a row here.
 model UserCredential {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId          String   @unique @map("user_id") @db.Uuid
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// argon2id hash of the password.
-  passwordHash    String   @map("password_hash")
+  passwordHash String @map("password_hash")
 
   /// Force password change on next login (admin reset).
-  mustChange      Boolean  @default(false) @map("must_change")
+  mustChange Boolean @default(false) @map("must_change")
 
   /// Last successful login. Stale rows = candidates for re-verification.
-  lastVerifiedAt  DateTime @default(now()) @map("last_verified_at") @db.Timestamptz()
+  lastVerifiedAt DateTime @default(now()) @map("last_verified_at") @db.Timestamptz()
 
   /// Lockout state — after N failed attempts within M minutes. We track the
   /// window's start so attempts older than the window roll off and don't
   /// stack forever.
-  failedAttempts         Int       @default(0) @map("failed_attempts")
-  failedWindowStartedAt  DateTime? @map("failed_window_started_at") @db.Timestamptz()
-  lockedUntil            DateTime? @map("locked_until") @db.Timestamptz()
+  failedAttempts        Int       @default(0) @map("failed_attempts")
+  failedWindowStartedAt DateTime? @map("failed_window_started_at") @db.Timestamptz()
+  lockedUntil           DateTime? @map("locked_until") @db.Timestamptz()
 
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@map("user_credentials")
 }
@@ -182,34 +191,34 @@ model UserCredential {
 /// links, password reset, OTPs, MFA step-up. Never store the plaintext
 /// token — only sha256.
 model AuthToken {
-  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
   /// What kind of token. Determines validity window + delivery channel.
-  purpose       AuthTokenPurpose
+  purpose AuthTokenPurpose
 
   /// sha256 of the opaque token sent to user. Never store plaintext.
-  tokenHash     String           @unique @map("token_hash")
+  tokenHash String @unique @map("token_hash")
 
   /// FK — null for unauthenticated flows (signup email verification before
   /// the User row exists). For password reset, points at the user.
-  userId        String?          @map("user_id") @db.Uuid
-  user          User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// Identity claim we're verifying. For email verification = the new email.
   /// For OTP = phone number. For password reset = email.
-  identifier    String           @db.Citext
+  identifier String @db.Citext
 
   /// For OTP / OTP-link: 6-8 digit code (also hashed). For magic link: null.
-  codeHash      String?          @map("code_hash")
+  codeHash String? @map("code_hash")
 
   /// Anti-replay: stamped on first successful redemption.
-  consumedAt    DateTime?        @map("consumed_at") @db.Timestamptz()
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz()
 
   /// Anti-abuse counters.
-  attempts      Int              @default(0)
+  attempts Int @default(0)
 
-  expiresAt     DateTime         @map("expires_at") @db.Timestamptz()
-  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  expiresAt DateTime @map("expires_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@index([userId, purpose])
   @@index([identifier, purpose])
@@ -231,17 +240,17 @@ enum AuthTokenPurpose {
 /// Server-validated session. If you adopt a stateless JWT-only auth,
 /// you can leave this empty; it's here to support session revocation.
 model Session {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tokenHash   String    @unique @map("token_hash")
-  ipAddress   String?   @map("ip_address") @db.Inet
-  userAgent   String?   @map("user_agent")
+  tokenHash String  @unique @map("token_hash")
+  ipAddress String? @map("ip_address") @db.Inet
+  userAgent String? @map("user_agent")
 
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  expiresAt   DateTime  @map("expires_at") @db.Timestamptz()
-  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz()
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz()
 
   @@index([userId])
   @@index([expiresAt])
@@ -251,16 +260,16 @@ model Session {
 /// Maps a user to their identity in a downstream system (Discourse, Stream
 /// Chat, Beehiiv). One row per (user, provider).
 model ExternalIdentity {
-  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId         String           @map("user_id") @db.Uuid
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   provider       ExternalProvider
   externalUserId String           @map("external_user_id")
   metadata       Json?            @db.JsonB
 
-  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@unique([provider, externalUserId])
   @@unique([userId, provider])
@@ -298,16 +307,16 @@ enum Locale {
 /// Plan = Reader / Premium / Pro Desk. Stripe price/product IDs are stored
 /// per-billing-interval so we can drive Checkout from this single row.
 model Plan {
-  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  key       PlanKey @unique
+  id  String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key PlanKey @unique
 
-  name      String
-  summary   String?
+  name    String
+  summary String?
 
   // Pricing in smallest currency unit (USD cents)
-  monthlyPriceCents Int?    @map("monthly_price_cents")
-  annualPriceCents  Int?    @map("annual_price_cents")
-  currency          String  @default("USD")
+  monthlyPriceCents Int?   @map("monthly_price_cents")
+  annualPriceCents  Int?   @map("annual_price_cents")
+  currency          String @default("USD")
 
   // Stripe linkage (one product, two prices for monthly / annual)
   stripeProductId      String? @unique @map("stripe_product_id")
@@ -316,7 +325,7 @@ model Plan {
 
   /// Feature matrix. Read by the paywall rule engine.
   /// Example: { liveReplay: true, liveQA: false, modelFiles: false }
-  features  Json    @db.JsonB
+  features Json @db.JsonB
 
   active    Boolean @default(true)
   sortOrder Int     @default(0) @map("sort_order")
@@ -346,25 +355,25 @@ enum PlanKey {
 /// class in Prisma; see migrations/{ts}_partial_unique_active_sub.sql for
 /// the DB-level guarantee.
 model Subscription {
-  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId          String              @map("user_id") @db.Uuid
-  user            User                @relation(fields: [userId], references: [id])
-  planId          String              @map("plan_id") @db.Uuid
-  plan            Plan                @relation(fields: [planId], references: [id])
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
+  planId String @map("plan_id") @db.Uuid
+  plan   Plan   @relation(fields: [planId], references: [id])
 
   state           SubscriptionState
-  billingInterval BillingInterval     @map("billing_interval")
+  billingInterval BillingInterval   @map("billing_interval")
 
   // Trial window
-  trialStartedAt  DateTime?           @map("trial_started_at") @db.Timestamptz()
-  trialEndsAt     DateTime?           @map("trial_ends_at") @db.Timestamptz()
+  trialStartedAt DateTime? @map("trial_started_at") @db.Timestamptz()
+  trialEndsAt    DateTime? @map("trial_ends_at") @db.Timestamptz()
 
   // Current paid period
-  currentPeriodStart DateTime?        @map("current_period_start") @db.Timestamptz()
-  currentPeriodEnd   DateTime?        @map("current_period_end") @db.Timestamptz()
+  currentPeriodStart DateTime? @map("current_period_start") @db.Timestamptz()
+  currentPeriodEnd   DateTime? @map("current_period_end") @db.Timestamptz()
 
   // Grace period after a failed payment (default 7 days)
-  graceEndsAt        DateTime?        @map("grace_ends_at") @db.Timestamptz()
+  graceEndsAt DateTime? @map("grace_ends_at") @db.Timestamptz()
 
   // Cancellation
   canceledAt           DateTime?           @map("canceled_at") @db.Timestamptz()
@@ -373,20 +382,25 @@ model Subscription {
   cancellationFeedback String?             @map("cancellation_feedback") @db.Text
 
   // Stripe linkage
-  stripeSubscriptionId String?        @unique @map("stripe_subscription_id")
-  stripeCustomerId     String?        @map("stripe_customer_id")
+  stripeSubscriptionId String? @unique @map("stripe_subscription_id")
+  stripeCustomerId     String? @map("stripe_customer_id")
+
+  // High-water mark for out-of-order Stripe webhook delivery. Set to the
+  // `event.created` (UTC) of the most recent Stripe event we acted on for
+  // this subscription. Events with an older timestamp are dropped.
+  lastStripeEventAt    DateTime? @map("last_stripe_event_at") @db.Timestamptz()
 
   // Where the user signed up (homepage / article-cta / referral / ...)
-  signupSource         String?        @map("signup_source")
+  signupSource   String? @map("signup_source")
   // Referral attribution (denormalized for fast reads)
-  referralCodeId       String?        @map("referral_code_id") @db.Uuid
+  referralCodeId String? @map("referral_code_id") @db.Uuid
 
-  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
-  events             SubscriptionEvent[]
-  invoices           Invoice[]
-  couponRedemptions  CouponRedemption[]
+  events            SubscriptionEvent[]
+  invoices          Invoice[]
+  couponRedemptions CouponRedemption[]
 
   @@index([userId])
   @@index([state])
@@ -418,20 +432,20 @@ enum BillingInterval {
 /// email, Stream Chat group add, Discourse SSO) read unprocessed rows and
 /// stamp `processed_at` when done. Idempotent on `external_event_id`.
 model SubscriptionEvent {
-  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  subscriptionId  String            @map("subscription_id") @db.Uuid
-  subscription    Subscription      @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subscriptionId String       @map("subscription_id") @db.Uuid
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
-  eventType       String            @map("event_type")
-  fromState       SubscriptionState? @map("from_state")
-  toState         SubscriptionState  @map("to_state")
+  eventType String             @map("event_type")
+  fromState SubscriptionState? @map("from_state")
+  toState   SubscriptionState  @map("to_state")
 
-  externalEventId String?           @unique @map("external_event_id")
-  payload         Json              @db.JsonB
+  externalEventId String? @unique @map("external_event_id")
+  payload         Json    @db.JsonB
 
-  processedAt     DateTime?         @map("processed_at") @db.Timestamptz()
+  processedAt DateTime? @map("processed_at") @db.Timestamptz()
 
-  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@index([subscriptionId])
   @@index([processedAt])
@@ -440,22 +454,22 @@ model SubscriptionEvent {
 
 /// A saved card / wallet. Mirrored from Stripe; never holds raw card data.
 model PaymentMethod {
-  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId      String          @map("user_id") @db.Uuid
-  user        User            @relation(fields: [userId], references: [id])
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
 
-  provider    PaymentProvider
-  externalId  String          @map("external_id") // Stripe pm_xxx
+  provider   PaymentProvider
+  externalId String          @map("external_id") // Stripe pm_xxx
 
-  brand       String?         // visa, mastercard, amex, ...
-  last4       String?         @db.VarChar(4)
-  expMonth    Int?            @map("exp_month")
-  expYear     Int?            @map("exp_year")
+  brand    String? // visa, mastercard, amex, ...
+  last4    String? @db.VarChar(4)
+  expMonth Int?    @map("exp_month")
+  expYear  Int?    @map("exp_year")
 
-  isDefault   Boolean         @default(false) @map("is_default")
+  isDefault Boolean @default(false) @map("is_default")
 
-  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz()
-  removedAt   DateTime?       @map("removed_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  removedAt DateTime? @map("removed_at") @db.Timestamptz()
 
   @@unique([provider, externalId])
   @@index([userId])
@@ -464,41 +478,41 @@ model PaymentMethod {
 
 enum PaymentProvider {
   stripe
-  alipay        // reserved for Phase 2+
-  wechat_pay    // reserved for Phase 2+
-  manual        // comped / invoiced
+  alipay // reserved for Phase 2+
+  wechat_pay // reserved for Phase 2+
+  manual // comped / invoiced
 
   @@map("payment_provider")
 }
 
 model Invoice {
-  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId            String          @map("user_id") @db.Uuid
-  user              User            @relation(fields: [userId], references: [id])
-  subscriptionId    String?         @map("subscription_id") @db.Uuid
-  subscription      Subscription?   @relation(fields: [subscriptionId], references: [id])
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String        @map("user_id") @db.Uuid
+  user           User          @relation(fields: [userId], references: [id])
+  subscriptionId String?       @map("subscription_id") @db.Uuid
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
 
-  status            InvoiceStatus
+  status InvoiceStatus
 
-  amountDueCents    Int             @map("amount_due_cents")
-  amountPaidCents   Int             @default(0) @map("amount_paid_cents")
-  taxCents          Int             @default(0) @map("tax_cents")
-  currency          String          @default("USD")
+  amountDueCents  Int    @map("amount_due_cents")
+  amountPaidCents Int    @default(0) @map("amount_paid_cents")
+  taxCents        Int    @default(0) @map("tax_cents")
+  currency        String @default("USD")
 
   provider          PaymentProvider @default(stripe)
   externalInvoiceId String?         @unique @map("external_invoice_id")
 
-  issuedAt          DateTime        @map("issued_at") @db.Timestamptz()
-  dueAt             DateTime?       @map("due_at") @db.Timestamptz()
-  paidAt            DateTime?       @map("paid_at") @db.Timestamptz()
+  issuedAt DateTime  @map("issued_at") @db.Timestamptz()
+  dueAt    DateTime? @map("due_at") @db.Timestamptz()
+  paidAt   DateTime? @map("paid_at") @db.Timestamptz()
 
-  hostedInvoiceUrl  String?         @map("hosted_invoice_url")
-  pdfUrl            String?         @map("pdf_url")
+  hostedInvoiceUrl String? @map("hosted_invoice_url")
+  pdfUrl           String? @map("pdf_url")
 
-  payments          Payment[]
+  payments Payment[]
 
-  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@index([userId])
   @@index([subscriptionId])
@@ -517,33 +531,33 @@ enum InvoiceStatus {
 }
 
 model Payment {
-  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId              String          @map("user_id") @db.Uuid
-  user                User            @relation(fields: [userId], references: [id])
-  invoiceId           String?         @map("invoice_id") @db.Uuid
-  invoice             Invoice?        @relation(fields: [invoiceId], references: [id])
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id])
+  invoiceId String?  @map("invoice_id") @db.Uuid
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
 
-  status              PaymentStatus
+  status PaymentStatus
 
-  amountCents         Int             @map("amount_cents")
-  currency            String          @default("USD")
+  amountCents Int    @map("amount_cents")
+  currency    String @default("USD")
 
-  provider            PaymentProvider
-  externalId          String          @map("external_id")        // Stripe pi_xxx
-  externalChargeId    String?         @map("external_charge_id") // Stripe ch_xxx
+  provider         PaymentProvider
+  externalId       String          @map("external_id") // Stripe pi_xxx
+  externalChargeId String?         @map("external_charge_id") // Stripe ch_xxx
 
   // Idempotency for webhook handlers
-  externalEventId     String?         @unique @map("external_event_id")
+  externalEventId String? @unique @map("external_event_id")
 
-  failureCode         String?         @map("failure_code")
-  failureMessage      String?         @map("failure_message")
+  failureCode    String? @map("failure_code")
+  failureMessage String? @map("failure_message")
 
-  refundedAmountCents Int             @default(0) @map("refunded_amount_cents")
+  refundedAmountCents Int @default(0) @map("refunded_amount_cents")
 
-  refunds             Refund[]
+  refunds Refund[]
 
-  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt           DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@unique([provider, externalId])
   @@index([userId])
@@ -562,17 +576,17 @@ enum PaymentStatus {
 }
 
 model Refund {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  paymentId       String   @map("payment_id") @db.Uuid
-  payment         Payment  @relation(fields: [paymentId], references: [id])
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paymentId String  @map("payment_id") @db.Uuid
+  payment   Payment @relation(fields: [paymentId], references: [id])
 
-  amountCents     Int      @map("amount_cents")
-  reason          String?
+  amountCents Int     @map("amount_cents")
+  reason      String?
 
-  externalId      String   @map("external_id") // Stripe re_xxx
-  externalEventId String?  @unique @map("external_event_id")
+  externalId      String  @map("external_id") // Stripe re_xxx
+  externalEventId String? @unique @map("external_event_id")
 
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@unique([externalId])
   @@index([paymentId])
@@ -584,21 +598,21 @@ model Refund {
 // ============================================================================
 
 model Author {
-  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug            String           @unique
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug String @unique
 
-  name            String
-  title           String?
-  bio             String?          @db.Text
+  name  String
+  title String?
+  bio   String? @db.Text
 
-  avatarAssetId   String?          @map("avatar_asset_id") @db.Uuid
-  avatar          MediaAsset?      @relation("AuthorAvatar", fields: [avatarAssetId], references: [id])
+  avatarAssetId String?     @map("avatar_asset_id") @db.Uuid
+  avatar        MediaAsset? @relation("AuthorAvatar", fields: [avatarAssetId], references: [id])
 
-  twitterHandle   String?          @map("twitter_handle")
-  linkedinUrl     String?          @map("linkedin_url")
+  twitterHandle String? @map("twitter_handle")
+  linkedinUrl   String? @map("linkedin_url")
 
-  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   articleAuthors      ArticleAuthor[]
   liveStreamHosts     LiveStreamHost[]
@@ -611,52 +625,52 @@ model Author {
 /// each kind may have additional metadata in a 1:1 child table
 /// (`PodcastEpisode`, `NewsletterCampaign`).
 model Article {
-  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug          String         @unique
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug String @unique
 
-  kind          ArticleKind
-  status        ArticleStatus
+  kind   ArticleKind
+  status ArticleStatus
 
   /// What plan tier is needed to read the FULL body. The free preview is
   /// always rendered; the paywall component cuts off based on this.
-  requiredTier  PlanKey        @default(free) @map("required_tier")
+  requiredTier PlanKey @default(free) @map("required_tier")
 
   /// Compliance classification for financial content.
   /// `specific_recommendation` triggers mandatory legal review + extra disclaimer.
   complianceClass ComplianceClass @default(market_commentary) @map("compliance_class")
 
-  publishedAt   DateTime?      @map("published_at") @db.Timestamptz()
-  scheduledFor  DateTime?      @map("scheduled_for") @db.Timestamptz()
+  publishedAt  DateTime? @map("published_at") @db.Timestamptz()
+  scheduledFor DateTime? @map("scheduled_for") @db.Timestamptz()
 
   heroImageAssetId String?     @map("hero_image_asset_id") @db.Uuid
-  heroImage     MediaAsset?    @relation("ArticleHeroImage", fields: [heroImageAssetId], references: [id])
+  heroImage        MediaAsset? @relation("ArticleHeroImage", fields: [heroImageAssetId], references: [id])
 
-  categoryId    String?        @map("category_id") @db.Uuid
-  category      Category?      @relation(fields: [categoryId], references: [id])
+  categoryId String?   @map("category_id") @db.Uuid
+  category   Category? @relation(fields: [categoryId], references: [id])
 
   // 1:1 children for kind-specific extension
   newsletterCampaign NewsletterCampaign?
   podcastEpisode     PodcastEpisode?
 
   // M:N
-  authors       ArticleAuthor[]
-  tags          ArticleTag[]
-  translations  ArticleTranslation[]
+  authors      ArticleAuthor[]
+  tags         ArticleTag[]
+  translations ArticleTranslation[]
 
   // Behavior tracking
-  views         ArticleView[]
-  readProgress  ArticleReadProgress[]
+  views        ArticleView[]
+  readProgress ArticleReadProgress[]
 
   // Compliance workflow
-  reviews              ArticleReview[]
-  positionDisclosures  EditorialPositionDisclosure[]
-  errata               ArticleErratum[]
-  sources              ArticleSource[]
-  dailyMetrics         ArticleDailyMetric[]
+  reviews             ArticleReview[]
+  positionDisclosures EditorialPositionDisclosure[]
+  errata              ArticleErratum[]
+  sources             ArticleSource[]
+  dailyMetrics        ArticleDailyMetric[]
 
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
-  deletedAt     DateTime?      @map("deleted_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz()
 
   @@index([status, publishedAt])
   @@index([kind, requiredTier])
@@ -675,8 +689,8 @@ enum ArticleKind {
 
 enum ArticleStatus {
   draft
-  in_review        // editor handed off to reviewer
-  legal_review     // flagged as specific_recommendation, needs legal sign-off
+  in_review // editor handed off to reviewer
+  legal_review // flagged as specific_recommendation, needs legal sign-off
   scheduled
   published
   archived
@@ -688,28 +702,28 @@ enum ArticleStatus {
 /// MDX body + SEO fields. We do NOT auto-translate — translations are
 /// human-edited rows in this table.
 model ArticleTranslation {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  articleId      String   @map("article_id") @db.Uuid
-  article        Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId String  @map("article_id") @db.Uuid
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
-  locale         Locale
+  locale Locale
 
-  title          String
-  subtitle       String?
-  bodyMdx        String   @map("body_mdx") @db.Text
-  excerpt        String   @db.Text
+  title    String
+  subtitle String?
+  bodyMdx  String  @map("body_mdx") @db.Text
+  excerpt  String  @db.Text
 
   // SEO
-  seoTitle       String?  @map("seo_title")
-  seoDescription String?  @map("seo_description")
+  seoTitle       String? @map("seo_title")
+  seoDescription String? @map("seo_description")
 
   // Monotonic version number, bumped on every save
-  currentVersion Int      @default(1) @map("current_version")
+  currentVersion Int @default(1) @map("current_version")
 
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
-  revisions      ArticleTranslationRevision[]
+  revisions ArticleTranslationRevision[]
 
   @@unique([articleId, locale])
   @@map("article_translations")
@@ -721,33 +735,33 @@ model ArticleAuthor {
   authorId  String  @map("author_id") @db.Uuid
   author    Author  @relation(fields: [authorId], references: [id])
 
-  role      String  @default("author") // author / editor / host / guest
-  sortOrder Int     @default(0) @map("sort_order")
+  role      String @default("author") // author / editor / host / guest
+  sortOrder Int    @default(0) @map("sort_order")
 
   @@id([articleId, authorId])
   @@map("article_authors")
 }
 
 model Category {
-  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug      String     @unique
-  name      String
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug String @unique
+  name String
 
-  parentId  String?    @map("parent_id") @db.Uuid
-  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children  Category[] @relation("CategoryHierarchy")
+  parentId String?    @map("parent_id") @db.Uuid
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
 
-  articles  Article[]
+  articles Article[]
 
   @@map("categories")
 }
 
 model Tag {
-  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug      String       @unique
-  name      String
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug String @unique
+  name String
 
-  articles  ArticleTag[]
+  articles ArticleTag[]
 
   @@map("tags")
 }
@@ -764,35 +778,35 @@ model ArticleTag {
 
 /// 1:1 extension on Article when kind = podcast.
 model PodcastEpisode {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  articleId        String   @unique @map("article_id") @db.Uuid
-  article          Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId String  @unique @map("article_id") @db.Uuid
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
-  episodeNumber    Int      @map("episode_number")
-  seasonNumber     Int?     @map("season_number")
+  episodeNumber Int  @map("episode_number")
+  seasonNumber  Int? @map("season_number")
 
   // Audio — canonical reference lives on MediaAsset.
   // durationSeconds is duplicated here for fast list queries; it MUST match
   // audioAsset.durationSeconds (enforced by app-layer save hook).
-  audioAssetId     String   @map("audio_asset_id") @db.Uuid
-  audioAsset       MediaAsset @relation("PodcastAudio", fields: [audioAssetId], references: [id])
-  durationSeconds  Int      @map("duration_seconds")
+  audioAssetId    String     @map("audio_asset_id") @db.Uuid
+  audioAsset      MediaAsset @relation("PodcastAudio", fields: [audioAssetId], references: [id])
+  durationSeconds Int        @map("duration_seconds")
 
   // Transcript file (text/vtt/srt). Optional — not all episodes have one.
-  transcriptAssetId String? @map("transcript_asset_id") @db.Uuid
+  transcriptAssetId String?     @map("transcript_asset_id") @db.Uuid
   transcriptAsset   MediaAsset? @relation("PodcastTranscript", fields: [transcriptAssetId], references: [id])
 
   // Distribution
-  appleEpisodeId   String?  @map("apple_episode_id")
-  spotifyEpisodeId String?  @map("spotify_episode_id")
+  appleEpisodeId   String? @map("apple_episode_id")
+  spotifyEpisodeId String? @map("spotify_episode_id")
 
   // Behavior
-  listenEvents     PodcastListenEvent[]
-  listenProgress   PodcastListenProgress[]
-  dailyMetrics     PodcastEpisodeDailyMetric[]
+  listenEvents   PodcastListenEvent[]
+  listenProgress PodcastListenProgress[]
+  dailyMetrics   PodcastEpisodeDailyMetric[]
 
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@map("podcast_episodes")
 }
@@ -803,40 +817,40 @@ model PodcastEpisode {
 
 /// A single newsletter "blast". One Article → one NewsletterCampaign.
 model NewsletterCampaign {
-  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  articleId          String           @unique @map("article_id") @db.Uuid
-  article            Article          @relation(fields: [articleId], references: [id])
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId String  @unique @map("article_id") @db.Uuid
+  article   Article @relation(fields: [articleId], references: [id])
 
-  status             CampaignStatus
+  status CampaignStatus
 
   /// Localized subject lines: { "en": "...", "zh-CN": "..." }
-  subjectLines       Json             @db.JsonB @map("subject_lines")
+  subjectLines Json @map("subject_lines") @db.JsonB
   /// Localized preview text (the snippet shown in inbox lists).
-  previewTexts       Json             @db.JsonB @map("preview_texts")
+  previewTexts Json @map("preview_texts") @db.JsonB
 
   // Targeting
-  targetTier         PlanKey?         @map("target_tier")     // null = all subscribers
-  targetLocale       Locale?          @map("target_locale")   // null = all locales
+  targetTier   PlanKey? @map("target_tier") // null = all subscribers
+  targetLocale Locale?  @map("target_locale") // null = all locales
 
   // Provider routing
-  provider           EmailProvider    @default(resend)
-  externalCampaignId String?          @map("external_campaign_id")
+  provider           EmailProvider @default(resend)
+  externalCampaignId String?       @map("external_campaign_id")
 
-  scheduledFor       DateTime?        @map("scheduled_for") @db.Timestamptz()
-  sentAt             DateTime?        @map("sent_at") @db.Timestamptz()
+  scheduledFor DateTime? @map("scheduled_for") @db.Timestamptz()
+  sentAt       DateTime? @map("sent_at") @db.Timestamptz()
 
   // Cached aggregates (refreshed by webhook handlers)
-  recipientCount     Int              @default(0) @map("recipient_count")
-  deliveredCount     Int              @default(0) @map("delivered_count")
-  openCount          Int              @default(0) @map("open_count")
-  clickCount         Int              @default(0) @map("click_count")
-  unsubscribeCount   Int              @default(0) @map("unsubscribe_count")
-  bounceCount        Int              @default(0) @map("bounce_count")
+  recipientCount   Int @default(0) @map("recipient_count")
+  deliveredCount   Int @default(0) @map("delivered_count")
+  openCount        Int @default(0) @map("open_count")
+  clickCount       Int @default(0) @map("click_count")
+  unsubscribeCount Int @default(0) @map("unsubscribe_count")
+  bounceCount      Int @default(0) @map("bounce_count")
 
-  sends              NewsletterSend[]
+  sends NewsletterSend[]
 
-  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@index([status])
   @@map("newsletter_campaigns")
@@ -865,25 +879,25 @@ enum EmailProvider {
 /// they are joined via `userId` when known, but anonymous email-only
 /// captures (homepage CTA) are also tracked here.
 model NewsletterSubscription {
-  id                  String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId              String?                      @map("user_id") @db.Uuid
-  user                User?                        @relation(fields: [userId], references: [id])
+  id     String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id])
 
-  email               String                       @unique @db.Citext
-  locale              Locale                       @default(en)
+  email  String @unique @db.Citext
+  locale Locale @default(en)
 
-  status              NewsletterSubscriptionStatus
-  source              String?                      // homepage / article-cta / referral
+  status NewsletterSubscriptionStatus
+  source String? // homepage / article-cta / referral
 
   // Beehiiv linkage during dual-send window (W17–W22)
-  beehiivSubscriberId String?                      @map("beehiiv_subscriber_id")
+  beehiivSubscriberId String? @map("beehiiv_subscriber_id")
 
-  subscribedAt        DateTime                     @default(now()) @map("subscribed_at") @db.Timestamptz()
-  unsubscribedAt      DateTime?                    @map("unsubscribed_at") @db.Timestamptz()
-  unsubscribeReason   UnsubscribeReason?           @map("unsubscribe_reason")
-  unsubscribeFeedback String?                      @map("unsubscribe_feedback") @db.Text
+  subscribedAt        DateTime           @default(now()) @map("subscribed_at") @db.Timestamptz()
+  unsubscribedAt      DateTime?          @map("unsubscribed_at") @db.Timestamptz()
+  unsubscribeReason   UnsubscribeReason? @map("unsubscribe_reason")
+  unsubscribeFeedback String?            @map("unsubscribe_feedback") @db.Text
 
-  sends               NewsletterSend[]
+  sends NewsletterSend[]
 
   @@index([userId])
   @@index([status])
@@ -902,28 +916,28 @@ enum NewsletterSubscriptionStatus {
 /// One row per (campaign, subscriber). Tracks the per-recipient send
 /// lifecycle: queued → sent → delivered → opened → clicked.
 model NewsletterSend {
-  id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  campaignId        String                  @map("campaign_id") @db.Uuid
-  campaign          NewsletterCampaign      @relation(fields: [campaignId], references: [id])
-  subscriptionId    String                  @map("subscription_id") @db.Uuid
-  subscription      NewsletterSubscription  @relation(fields: [subscriptionId], references: [id])
+  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId     String                 @map("campaign_id") @db.Uuid
+  campaign       NewsletterCampaign     @relation(fields: [campaignId], references: [id])
+  subscriptionId String                 @map("subscription_id") @db.Uuid
+  subscription   NewsletterSubscription @relation(fields: [subscriptionId], references: [id])
 
-  status            SendStatus
+  status SendStatus
 
-  externalMessageId String?                 @map("external_message_id")
+  externalMessageId String? @map("external_message_id")
 
-  sentAt            DateTime?               @map("sent_at") @db.Timestamptz()
-  deliveredAt       DateTime?               @map("delivered_at") @db.Timestamptz()
-  openedAt          DateTime?               @map("opened_at") @db.Timestamptz()
-  firstClickedAt    DateTime?               @map("first_clicked_at") @db.Timestamptz()
-  bouncedAt         DateTime?               @map("bounced_at") @db.Timestamptz()
-  bounceType        BounceType?             @map("bounce_type")
+  sentAt         DateTime?   @map("sent_at") @db.Timestamptz()
+  deliveredAt    DateTime?   @map("delivered_at") @db.Timestamptz()
+  openedAt       DateTime?   @map("opened_at") @db.Timestamptz()
+  firstClickedAt DateTime?   @map("first_clicked_at") @db.Timestamptz()
+  bouncedAt      DateTime?   @map("bounced_at") @db.Timestamptz()
+  bounceType     BounceType? @map("bounce_type")
   /// Raw provider code: SMTP code or Resend/SendGrid reason string.
-  bounceCode        String?                 @map("bounce_code")
+  bounceCode     String?     @map("bounce_code")
 
-  failureMessage    String?                 @map("failure_message")
+  failureMessage String? @map("failure_message")
 
-  linkClicks        NewsletterLinkClick[]
+  linkClicks NewsletterLinkClick[]
 
   @@unique([campaignId, subscriptionId])
   @@index([status])
@@ -945,40 +959,40 @@ enum SendStatus {
 // ============================================================================
 
 model LiveStream {
-  id                       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  title                    String
-  description              String?          @db.Text
+  title       String
+  description String? @db.Text
 
-  scheduledStartAt         DateTime         @map("scheduled_start_at") @db.Timestamptz()
-  scheduledEndAt           DateTime?        @map("scheduled_end_at") @db.Timestamptz()
-  actualStartAt            DateTime?        @map("actual_start_at") @db.Timestamptz()
-  actualEndAt              DateTime?        @map("actual_end_at") @db.Timestamptz()
+  scheduledStartAt DateTime  @map("scheduled_start_at") @db.Timestamptz()
+  scheduledEndAt   DateTime? @map("scheduled_end_at") @db.Timestamptz()
+  actualStartAt    DateTime? @map("actual_start_at") @db.Timestamptz()
+  actualEndAt      DateTime? @map("actual_end_at") @db.Timestamptz()
 
-  status                   LiveStreamStatus
-  requiredTier             PlanKey          @default(premium) @map("required_tier")
+  status       LiveStreamStatus
+  requiredTier PlanKey          @default(premium) @map("required_tier")
 
-  coverImageAssetId        String?          @map("cover_image_asset_id") @db.Uuid
-  coverImage               MediaAsset?      @relation("LiveStreamCover", fields: [coverImageAssetId], references: [id])
+  coverImageAssetId String?     @map("cover_image_asset_id") @db.Uuid
+  coverImage        MediaAsset? @relation("LiveStreamCover", fields: [coverImageAssetId], references: [id])
 
   // Mux integration
-  muxLiveStreamId          String?          @unique @map("mux_live_stream_id")
-  muxPlaybackId            String?          @map("mux_playback_id")
+  muxLiveStreamId String? @unique @map("mux_live_stream_id")
+  muxPlaybackId   String? @map("mux_playback_id")
   /// Tier-0 sensitive: never expose to client. Read access controlled by RLS.
-  muxStreamKey             String?          @map("mux_stream_key")
+  muxStreamKey    String? @map("mux_stream_key")
 
   // Recording (auto-generated by Mux post-broadcast)
-  recordingPlaybackId      String?          @map("recording_playback_id")
-  recordingDurationSeconds Int?             @map("recording_duration_seconds")
-  recordingAvailableUntil  DateTime?        @map("recording_available_until") @db.Timestamptz()
+  recordingPlaybackId      String?   @map("recording_playback_id")
+  recordingDurationSeconds Int?      @map("recording_duration_seconds")
+  recordingAvailableUntil  DateTime? @map("recording_available_until") @db.Timestamptz()
 
-  hosts                    LiveStreamHost[]
-  attendances              LiveAttendance[]
-  registrations            LiveRegistration[]
-  chapters                 LiveRecordingChapter[]
+  hosts         LiveStreamHost[]
+  attendances   LiveAttendance[]
+  registrations LiveRegistration[]
+  chapters      LiveRecordingChapter[]
 
-  createdAt                DateTime         @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt                DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@index([status, scheduledStartAt])
   @@map("live_streams")
@@ -999,24 +1013,24 @@ model LiveStreamHost {
   authorId     String     @map("author_id") @db.Uuid
   author       Author     @relation(fields: [authorId], references: [id])
 
-  role         String     // host / guest / moderator
-  sortOrder    Int        @default(0) @map("sort_order")
+  role      String // host / guest / moderator
+  sortOrder Int    @default(0) @map("sort_order")
 
   @@id([liveStreamId, authorId])
   @@map("live_stream_hosts")
 }
 
 model LiveAttendance {
-  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  liveStreamId    String          @map("live_stream_id") @db.Uuid
-  liveStream      LiveStream      @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
-  userId          String          @map("user_id") @db.Uuid
-  user            User            @relation(fields: [userId], references: [id])
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveStreamId String     @map("live_stream_id") @db.Uuid
+  liveStream   LiveStream @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
+  userId       String     @map("user_id") @db.Uuid
+  user         User       @relation(fields: [userId], references: [id])
 
-  attendanceType  AttendanceType  @map("attendance_type")
+  attendanceType AttendanceType @map("attendance_type")
 
-  joinedAt        DateTime        @default(now()) @map("joined_at") @db.Timestamptz()
-  leftAt          DateTime?       @map("left_at") @db.Timestamptz()
+  joinedAt DateTime  @default(now()) @map("joined_at") @db.Timestamptz()
+  leftAt   DateTime? @map("left_at") @db.Timestamptz()
 
   @@index([liveStreamId])
   @@index([userId])
@@ -1038,42 +1052,42 @@ enum AttendanceType {
 /// Chat — we only track membership and metadata here, so the paywall and
 /// admin tooling can join across users + groups.
 model ImGroup {
-  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug              String          @unique
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug String @unique
 
-  name              String
-  description       String?
+  name        String
+  description String?
 
-  requiredTier      PlanKey         @default(premium) @map("required_tier")
+  requiredTier PlanKey @default(premium) @map("required_tier")
 
   // Stream Chat linkage
-  streamChannelId   String?         @unique @map("stream_channel_id")
-  streamChannelType String?         @default("messaging") @map("stream_channel_type")
+  streamChannelId   String? @unique @map("stream_channel_id")
+  streamChannelType String? @default("messaging") @map("stream_channel_type")
 
   /// Cached for display; refreshed by membership-change triggers
-  memberCount       Int             @default(0) @map("member_count")
+  memberCount Int @default(0) @map("member_count")
 
-  active            Boolean         @default(true)
+  active Boolean @default(true)
 
-  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
-  memberships       ImMembership[]
+  memberships ImMembership[]
 
   @@map("im_groups")
 }
 
 model ImMembership {
-  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  groupId   String       @map("group_id") @db.Uuid
-  group     ImGroup      @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  userId    String       @map("user_id") @db.Uuid
-  user      User         @relation(fields: [userId], references: [id])
+  id      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupId String  @map("group_id") @db.Uuid
+  group   ImGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId  String  @map("user_id") @db.Uuid
+  user    User    @relation(fields: [userId], references: [id])
 
-  role      ImMemberRole @default(member)
+  role ImMemberRole @default(member)
 
-  joinedAt  DateTime     @default(now()) @map("joined_at") @db.Timestamptz()
-  leftAt    DateTime?    @map("left_at") @db.Timestamptz()
+  joinedAt DateTime  @default(now()) @map("joined_at") @db.Timestamptz()
+  leftAt   DateTime? @map("left_at") @db.Timestamptz()
 
   @@unique([groupId, userId])
   @@index([userId])
@@ -1099,37 +1113,37 @@ enum ImMemberRole {
 /// a KMS-managed key. The `*_cipher` suffix is a guardrail against
 /// accidentally querying plain values.
 model KycVerification {
-  id                          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId                      String        @map("user_id") @db.Uuid
-  user                        User          @relation(fields: [userId], references: [id])
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
 
-  level                       KycLevel
-  status                      KycStatus
+  level  KycLevel
+  status KycStatus
 
   // Provider used to verify (Phase 1 likely none; Phase 2: Persona / Sumsub)
-  provider                    String?
-  externalCaseId              String?       @map("external_case_id")
+  provider       String?
+  externalCaseId String? @map("external_case_id")
 
-  submittedAt                 DateTime?     @map("submitted_at") @db.Timestamptz()
-  decidedAt                   DateTime?     @map("decided_at") @db.Timestamptz()
+  submittedAt DateTime? @map("submitted_at") @db.Timestamptz()
+  decidedAt   DateTime? @map("decided_at") @db.Timestamptz()
 
-  reviewerNotes               String?       @map("reviewer_notes") @db.Text
-  rejectionReason             String?       @map("rejection_reason")
+  reviewerNotes   String? @map("reviewer_notes") @db.Text
+  rejectionReason String? @map("rejection_reason")
 
   // Encrypted PII (column-level encryption; never index-search these)
-  legalNameCipher             String?       @map("legal_name_cipher")
-  dobCipher                   String?       @map("dob_cipher")
-  taxIdCipher                 String?       @map("tax_id_cipher")
-  countryOfResidence          String?       @map("country_of_residence") // ISO-2
+  legalNameCipher    String? @map("legal_name_cipher")
+  dobCipher          String? @map("dob_cipher")
+  taxIdCipher        String? @map("tax_id_cipher")
+  countryOfResidence String? @map("country_of_residence") // ISO-2
 
   // Phase 2: SEC Reg D accredited investor
-  isAccreditedInvestor        Boolean       @default(false) @map("is_accredited_investor")
-  accreditedInvestorEvidence  Json?         @db.JsonB @map("accredited_investor_evidence")
+  isAccreditedInvestor       Boolean @default(false) @map("is_accredited_investor")
+  accreditedInvestorEvidence Json?   @map("accredited_investor_evidence") @db.JsonB
 
-  documents                   KycDocument[]
+  documents KycDocument[]
 
-  createdAt                   DateTime      @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt                   DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@index([userId, level])
   @@index([status])
@@ -1137,10 +1151,10 @@ model KycVerification {
 }
 
 enum KycLevel {
-  L0  // email + (optional) phone
-  L1  // legal name
-  L2  // government ID
-  L3  // accredited investor (Phase 2+)
+  L0 // email + (optional) phone
+  L1 // legal name
+  L2 // government ID
+  L3 // accredited investor (Phase 2+)
 
   @@map("kyc_level")
 }
@@ -1156,19 +1170,19 @@ enum KycStatus {
 }
 
 model KycDocument {
-  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  verificationId  String           @map("verification_id") @db.Uuid
-  verification    KycVerification  @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  verificationId String          @map("verification_id") @db.Uuid
+  verification   KycVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
 
-  documentType    String           @map("document_type") // passport / drivers_license / utility_bill / tax_return
+  documentType String @map("document_type") // passport / drivers_license / utility_bill / tax_return
 
   /// Object-storage reference (R2/S3 key, KMS-encrypted at rest)
-  storageKey      String           @map("storage_key")
-  contentType     String           @map("content_type")
-  fileSizeBytes   Int              @map("file_size_bytes")
+  storageKey    String @map("storage_key")
+  contentType   String @map("content_type")
+  fileSizeBytes Int    @map("file_size_bytes")
 
-  uploadedAt      DateTime         @default(now()) @map("uploaded_at") @db.Timestamptz()
-  expiresAt       DateTime?        @map("expires_at") @db.Timestamptz() // for purge job
+  uploadedAt DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz()
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz() // for purge job
 
   @@index([verificationId])
   @@map("kyc_documents")
@@ -1182,25 +1196,25 @@ model KycDocument {
 /// money, content visibility, or user records writes one row here.
 /// Retention: 6 months online, then archived to cold storage.
 model AuditLogEntry {
-  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  actorId      String?    @map("actor_id") @db.Uuid
-  actor        User?      @relation(fields: [actorId], references: [id])
-  actorType    ActorType  @map("actor_type")
+  actorId   String?   @map("actor_id") @db.Uuid
+  actor     User?     @relation(fields: [actorId], references: [id])
+  actorType ActorType @map("actor_type")
 
-  action       String     // user.login / subscription.canceled / article.published
-  resourceType String?    @map("resource_type")
-  resourceId   String?    @map("resource_id")
+  action       String // user.login / subscription.canceled / article.published
+  resourceType String? @map("resource_type")
+  resourceId   String? @map("resource_id")
 
-  oldValue     Json?      @db.JsonB @map("old_value")
-  newValue     Json?      @db.JsonB @map("new_value")
+  oldValue Json? @map("old_value") @db.JsonB
+  newValue Json? @map("new_value") @db.JsonB
 
-  ipAddress    String?    @map("ip_address") @db.Inet
-  userAgent    String?    @map("user_agent")
+  ipAddress String? @map("ip_address") @db.Inet
+  userAgent String? @map("user_agent")
   /// Free-form context (request id, correlation id, ...)
-  metadata     Json?      @db.JsonB
+  metadata  Json?   @db.JsonB
 
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@index([actorId, createdAt])
   @@index([resourceType, resourceId])
@@ -1222,47 +1236,47 @@ enum ActorType {
 // ============================================================================
 
 model ReferralCode {
-  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId              String                @map("owner_id") @db.Uuid
-  owner                User                  @relation("ReferralCodeOwner", fields: [ownerId], references: [id])
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  owner   User   @relation("ReferralCodeOwner", fields: [ownerId], references: [id])
 
-  code                 String                @unique
+  code String @unique
 
   /// What the referee gets (e.g. extended free trial)
-  refereeRewardPlanKey PlanKey?              @map("referee_reward_plan_key")
-  refereeRewardDays    Int?                  @map("referee_reward_days")
+  refereeRewardPlanKey PlanKey? @map("referee_reward_plan_key")
+  refereeRewardDays    Int?     @map("referee_reward_days")
   /// What the referer gets (account credit, in cents)
-  refererRewardCents   Int?                  @map("referer_reward_cents")
+  refererRewardCents   Int?     @map("referer_reward_cents")
 
-  active               Boolean               @default(true)
+  active Boolean @default(true)
 
-  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz()
-  expiresAt            DateTime?             @map("expires_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz()
 
-  attributions         ReferralAttribution[]
+  attributions ReferralAttribution[]
 
   @@index([ownerId])
   @@map("referral_codes")
 }
 
 model ReferralAttribution {
-  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  referralCodeId  String        @map("referral_code_id") @db.Uuid
-  referralCode    ReferralCode  @relation(fields: [referralCodeId], references: [id])
+  referralCodeId String       @map("referral_code_id") @db.Uuid
+  referralCode   ReferralCode @relation(fields: [referralCodeId], references: [id])
 
-  refererId       String        @map("referer_id") @db.Uuid
-  referer         User          @relation("Referer", fields: [refererId], references: [id])
+  refererId String @map("referer_id") @db.Uuid
+  referer   User   @relation("Referer", fields: [refererId], references: [id])
 
-  refereeId       String        @unique @map("referee_id") @db.Uuid
-  referee         User          @relation("Referee", fields: [refereeId], references: [id])
+  refereeId String @unique @map("referee_id") @db.Uuid
+  referee   User   @relation("Referee", fields: [refereeId], references: [id])
 
-  attributedAt    DateTime      @default(now()) @map("attributed_at") @db.Timestamptz()
+  attributedAt DateTime  @default(now()) @map("attributed_at") @db.Timestamptz()
   /// Stamped when the referee converts (subscribes to a paid plan)
-  convertedAt     DateTime?     @map("converted_at") @db.Timestamptz()
+  convertedAt  DateTime? @map("converted_at") @db.Timestamptz()
 
-  rewardPaidAt    DateTime?     @map("reward_paid_at") @db.Timestamptz()
-  rewardCents     Int?          @map("reward_cents")
+  rewardPaidAt DateTime? @map("reward_paid_at") @db.Timestamptz()
+  rewardCents  Int?      @map("reward_cents")
 
   @@index([refererId])
   @@index([referralCodeId])
@@ -1278,19 +1292,19 @@ model ReferralAttribution {
 /// uniqueness gives us free idempotency: if Stripe re-sends the same event,
 /// the second insert errors out and the handler is skipped.
 model WebhookEvent {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  provider        String    // stripe / mux / stream-chat / resend / beehiiv
-  externalEventId String    @map("external_event_id")
-  eventType       String    @map("event_type")
+  provider        String // stripe / mux / stream-chat / resend / beehiiv
+  externalEventId String @map("external_event_id")
+  eventType       String @map("event_type")
 
-  payload         Json      @db.JsonB
+  payload Json @db.JsonB
 
-  receivedAt      DateTime  @default(now()) @map("received_at") @db.Timestamptz()
-  processedAt     DateTime? @map("processed_at") @db.Timestamptz()
-  failedAt        DateTime? @map("failed_at") @db.Timestamptz()
-  failureMessage  String?   @map("failure_message")
-  retryCount      Int       @default(0) @map("retry_count")
+  receivedAt     DateTime  @default(now()) @map("received_at") @db.Timestamptz()
+  processedAt    DateTime? @map("processed_at") @db.Timestamptz()
+  failedAt       DateTime? @map("failed_at") @db.Timestamptz()
+  failureMessage String?   @map("failure_message")
+  retryCount     Int       @default(0) @map("retry_count")
 
   @@unique([provider, externalEventId])
   @@index([processedAt])
@@ -1318,26 +1332,26 @@ model WebhookEvent {
 /// Internal staff (editorial, engineering, ops, finance). 1:1 extension
 /// of `users` — every staff member has both rows.
 model StaffProfile {
-  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId              String    @unique @map("user_id") @db.Uuid
-  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  employeeId          String?   @unique @map("employee_id")
-  department          StaffDepartment
-  jobTitle            String?   @map("job_title")
+  employeeId String?         @unique @map("employee_id")
+  department StaffDepartment
+  jobTitle   String?         @map("job_title")
 
-  managerId           String?   @map("manager_id") @db.Uuid
-  manager             StaffProfile?  @relation("StaffManager", fields: [managerId], references: [id])
-  reports             StaffProfile[] @relation("StaffManager")
+  managerId String?        @map("manager_id") @db.Uuid
+  manager   StaffProfile?  @relation("StaffManager", fields: [managerId], references: [id])
+  reports   StaffProfile[] @relation("StaffManager")
 
-  hiredAt             DateTime  @map("hired_at") @db.Timestamptz()
-  departedAt          DateTime? @map("departed_at") @db.Timestamptz()
+  hiredAt    DateTime  @map("hired_at") @db.Timestamptz()
+  departedAt DateTime? @map("departed_at") @db.Timestamptz()
 
   /// Hardware 2FA (YubiKey) required to access admin tooling.
-  requireHardware2FA  Boolean   @default(true) @map("require_hardware_2fa")
+  requireHardware2FA Boolean @default(true) @map("require_hardware_2fa")
 
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@index([department])
   @@index([departedAt])
@@ -1358,16 +1372,16 @@ enum StaffDepartment {
 /// Named bundle of permissions. Roles are the unit a human admin assigns
 /// (you don't pick permissions one-by-one in the admin UI).
 model Role {
-  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  key         String           @unique     // editor / kyc_reviewer / finance_admin / super_admin
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key         String  @unique // editor / kyc_reviewer / finance_admin / super_admin
   name        String
-  description String?          @db.Text
+  description String? @db.Text
 
   /// System roles are seed-managed; the admin UI can't delete them.
-  isSystem    Boolean          @default(false) @map("is_system")
+  isSystem Boolean @default(false) @map("is_system")
 
-  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   permissions RolePermission[]
   userRoles   UserRole[]
@@ -1385,17 +1399,17 @@ model Role {
 ///   live.{schedule, broadcast, record}
 ///   system.{settings, roles, audit_log}
 model Permission {
-  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  key         String           @unique
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key         String             @unique
   category    PermissionCategory
-  description String?          @db.Text
+  description String?            @db.Text
   /// Hint: does this permission allow modification (vs read-only)?
-  isWrite     Boolean          @default(false) @map("is_write")
-  isSystem    Boolean          @default(true) @map("is_system")
+  isWrite     Boolean            @default(false) @map("is_write")
+  isSystem    Boolean            @default(true) @map("is_system")
 
-  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
-  roles       RolePermission[]
+  roles RolePermission[]
 
   @@index([category])
   @@map("permissions")
@@ -1419,7 +1433,7 @@ model RolePermission {
   permissionId String     @map("permission_id") @db.Uuid
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
-  grantedAt    DateTime   @default(now()) @map("granted_at") @db.Timestamptz()
+  grantedAt DateTime @default(now()) @map("granted_at") @db.Timestamptz()
 
   @@id([roleId, permissionId])
   @@map("role_permissions")
@@ -1428,24 +1442,24 @@ model RolePermission {
 /// User × Role assignment. May be scoped (e.g. moderator of one IM group)
 /// or global (super_admin). Supports time-bounded grants for contractors.
 model UserRole {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId        String    @map("user_id") @db.Uuid
-  user          User      @relation("UserRoleHolder", fields: [userId], references: [id])
-  roleId        String    @map("role_id") @db.Uuid
-  role          Role      @relation(fields: [roleId], references: [id])
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation("UserRoleHolder", fields: [userId], references: [id])
+  roleId String @map("role_id") @db.Uuid
+  role   Role   @relation(fields: [roleId], references: [id])
 
-  grantedAt     DateTime  @default(now()) @map("granted_at") @db.Timestamptz()
-  grantedById   String?   @map("granted_by_id") @db.Uuid
-  grantedBy     User?     @relation("UserRoleGrantedBy", fields: [grantedById], references: [id])
+  grantedAt   DateTime @default(now()) @map("granted_at") @db.Timestamptz()
+  grantedById String?  @map("granted_by_id") @db.Uuid
+  grantedBy   User?    @relation("UserRoleGrantedBy", fields: [grantedById], references: [id])
 
-  expiresAt     DateTime? @map("expires_at") @db.Timestamptz()
-  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz()
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz()
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz()
 
   /// Optional scope. `scope_type` + `scope_id` narrow this grant to a
   /// single resource (e.g. moderator of one specific IM group).
   /// Both null = global grant.
-  scopeType     String?   @map("scope_type")
-  scopeId       String?   @map("scope_id") @db.Uuid
+  scopeType String? @map("scope_type")
+  scopeId   String? @map("scope_id") @db.Uuid
 
   @@unique([userId, roleId, scopeType, scopeId])
   @@index([userId])
@@ -1471,29 +1485,29 @@ model UserRole {
 /// One row per "page view" of an article. Anonymous reads are tracked by
 /// `visitor_id` (a cookie fingerprint), authenticated by `user_id`.
 model ArticleView {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  articleId       String   @map("article_id") @db.Uuid
-  article         Article  @relation(fields: [articleId], references: [id])
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId String  @map("article_id") @db.Uuid
+  article   Article @relation(fields: [articleId], references: [id])
 
-  userId          String?  @map("user_id") @db.Uuid
-  user            User?    @relation(fields: [userId], references: [id])
-  visitorId       String?  @map("visitor_id")
+  userId    String? @map("user_id") @db.Uuid
+  user      User?   @relation(fields: [userId], references: [id])
+  visitorId String? @map("visitor_id")
 
-  locale          Locale
+  locale Locale
 
   /// Did the user hit the paywall (saw teaser only)?
-  wasPaywalled    Boolean  @default(false) @map("was_paywalled")
+  wasPaywalled Boolean @default(false) @map("was_paywalled")
 
-  referrer        String?
-  utmSource       String?  @map("utm_source")
-  utmMedium       String?  @map("utm_medium")
-  utmCampaign     String?  @map("utm_campaign")
+  referrer    String?
+  utmSource   String? @map("utm_source")
+  utmMedium   String? @map("utm_medium")
+  utmCampaign String? @map("utm_campaign")
 
-  deviceType      String?  @map("device_type")     // mobile / tablet / desktop
-  ipAddress       String?  @map("ip_address") @db.Inet
-  userAgent       String?  @map("user_agent")
+  deviceType String? @map("device_type") // mobile / tablet / desktop
+  ipAddress  String? @map("ip_address") @db.Inet
+  userAgent  String? @map("user_agent")
 
-  viewedAt        DateTime @default(now()) @map("viewed_at") @db.Timestamptz()
+  viewedAt DateTime @default(now()) @map("viewed_at") @db.Timestamptz()
 
   @@index([articleId, viewedAt])
   @@index([userId, viewedAt])
@@ -1504,22 +1518,22 @@ model ArticleView {
 
 /// Per-user resume state for an article. Updated on scroll / time milestones.
 model ArticleReadProgress {
-  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  articleId         String    @map("article_id") @db.Uuid
-  article           Article   @relation(fields: [articleId], references: [id])
-  userId            String    @map("user_id") @db.Uuid
-  user              User      @relation(fields: [userId], references: [id])
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId String  @map("article_id") @db.Uuid
+  article   Article @relation(fields: [articleId], references: [id])
+  userId    String  @map("user_id") @db.Uuid
+  user      User    @relation(fields: [userId], references: [id])
 
   /// 0-100; furthest scroll percentage reached.
-  progressPercent   Int       @map("progress_percent")
+  progressPercent  Int @map("progress_percent")
   /// Cumulative seconds spent reading across all visits.
-  timeSpentSeconds  Int       @default(0) @map("time_spent_seconds")
+  timeSpentSeconds Int @default(0) @map("time_spent_seconds")
 
   /// Stamped when scroll ≥90% AND timeSpent ≥30s.
-  completedAt       DateTime? @map("completed_at") @db.Timestamptz()
+  completedAt DateTime? @map("completed_at") @db.Timestamptz()
 
-  firstReadAt       DateTime  @default(now()) @map("first_read_at") @db.Timestamptz()
-  lastReadAt        DateTime  @default(now()) @map("last_read_at") @db.Timestamptz()
+  firstReadAt DateTime @default(now()) @map("first_read_at") @db.Timestamptz()
+  lastReadAt  DateTime @default(now()) @map("last_read_at") @db.Timestamptz()
 
   @@unique([articleId, userId])
   @@index([userId, lastReadAt])
@@ -1529,23 +1543,23 @@ model ArticleReadProgress {
 /// Append-only log of podcast playback events for analytics. Truncate to
 /// 90 days; the long-term aggregate lives in PodcastListenProgress.
 model PodcastListenEvent {
-  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  episodeId       String           @map("episode_id") @db.Uuid
-  episode         PodcastEpisode   @relation(fields: [episodeId], references: [id])
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  episodeId String         @map("episode_id") @db.Uuid
+  episode   PodcastEpisode @relation(fields: [episodeId], references: [id])
 
-  userId          String?          @map("user_id") @db.Uuid
-  user            User?            @relation(fields: [userId], references: [id])
-  visitorId       String?          @map("visitor_id")
+  userId    String? @map("user_id") @db.Uuid
+  user      User?   @relation(fields: [userId], references: [id])
+  visitorId String? @map("visitor_id")
 
   eventType       PodcastEventType @map("event_type")
   /// Position in the audio at time of event.
   positionSeconds Int              @map("position_seconds")
 
   /// Where playback happened: web / ios / android / apple_podcasts / spotify / overcast
-  source          String?
-  deviceType      String?          @map("device_type")
+  source     String?
+  deviceType String? @map("device_type")
 
-  occurredAt      DateTime         @default(now()) @map("occurred_at") @db.Timestamptz()
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz()
 
   @@index([episodeId, occurredAt])
   @@index([userId])
@@ -1565,24 +1579,24 @@ enum PodcastEventType {
 
 /// Per-user resume state for a podcast episode. One row per (user, episode).
 model PodcastListenProgress {
-  id                  String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  episodeId           String         @map("episode_id") @db.Uuid
-  episode             PodcastEpisode @relation(fields: [episodeId], references: [id])
-  userId              String         @map("user_id") @db.Uuid
-  user                User           @relation(fields: [userId], references: [id])
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  episodeId String         @map("episode_id") @db.Uuid
+  episode   PodcastEpisode @relation(fields: [episodeId], references: [id])
+  userId    String         @map("user_id") @db.Uuid
+  user      User           @relation(fields: [userId], references: [id])
 
   /// Where to resume from.
-  positionSeconds     Int            @map("position_seconds")
+  positionSeconds Int       @map("position_seconds")
   /// Furthest second reached across all sessions.
-  furthestSeconds     Int            @map("furthest_seconds")
+  furthestSeconds Int       @map("furthest_seconds")
   /// Stamped when `furthest_seconds` is within 30s of `durationSeconds`.
-  completedAt         DateTime?      @map("completed_at") @db.Timestamptz()
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz()
 
   /// Cumulative listen time across all sessions.
-  totalListenSeconds  Int            @default(0) @map("total_listen_seconds")
+  totalListenSeconds Int @default(0) @map("total_listen_seconds")
 
-  firstStartedAt      DateTime       @default(now()) @map("first_started_at") @db.Timestamptz()
-  lastListenedAt      DateTime       @default(now()) @map("last_listened_at") @db.Timestamptz()
+  firstStartedAt DateTime @default(now()) @map("first_started_at") @db.Timestamptz()
+  lastListenedAt DateTime @default(now()) @map("last_listened_at") @db.Timestamptz()
 
   @@unique([episodeId, userId])
   @@index([userId, lastListenedAt])
@@ -1594,16 +1608,16 @@ model PodcastListenProgress {
 /// resource_id may point to any of several tables). A nightly job prunes
 /// orphans.
 model ContentBookmark {
-  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId          String           @map("user_id") @db.Uuid
-  user            User             @relation(fields: [userId], references: [id])
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
 
-  resourceType    BookmarkableType @map("resource_type")
-  resourceId      String           @map("resource_id") @db.Uuid
+  resourceType BookmarkableType @map("resource_type")
+  resourceId   String           @map("resource_id") @db.Uuid
 
-  note            String?          @db.Text
+  note String? @db.Text
 
-  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@unique([userId, resourceType, resourceId])
   @@index([userId, createdAt])
@@ -1622,16 +1636,16 @@ enum BookmarkableType {
 /// Reactions = like / insightful / etc. One reaction per type per resource
 /// per user. Same polymorphic caveat as ContentBookmark.
 model ContentReaction {
-  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId        String        @map("user_id") @db.Uuid
-  user          User          @relation(fields: [userId], references: [id])
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
 
-  resourceType  ReactableType @map("resource_type")
-  resourceId    String        @map("resource_id") @db.Uuid
+  resourceType ReactableType @map("resource_type")
+  resourceId   String        @map("resource_id") @db.Uuid
 
-  reactionType  ReactionType  @map("reaction_type")
+  reactionType ReactionType @map("reaction_type")
 
-  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@unique([userId, resourceType, resourceId, reactionType])
   @@index([resourceType, resourceId, reactionType])
@@ -1659,19 +1673,19 @@ enum ReactionType {
 /// Outbound share events. Captures the destination so we can track
 /// viral channel performance (Twitter vs LinkedIn vs WeChat etc.).
 model ContentShare {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  resourceType    String   @map("resource_type")    // article / podcast_episode / live_stream
-  resourceId      String   @map("resource_id") @db.Uuid
+  resourceType String @map("resource_type") // article / podcast_episode / live_stream
+  resourceId   String @map("resource_id") @db.Uuid
 
-  userId          String?  @map("user_id") @db.Uuid
-  user            User?    @relation(fields: [userId], references: [id])
-  visitorId       String?  @map("visitor_id")
+  userId    String? @map("user_id") @db.Uuid
+  user      User?   @relation(fields: [userId], references: [id])
+  visitorId String? @map("visitor_id")
 
   /// twitter / x / linkedin / email / copy_link / wechat / weibo / facebook
-  destination     String
+  destination String
 
-  sharedAt        DateTime @default(now()) @map("shared_at") @db.Timestamptz()
+  sharedAt DateTime @default(now()) @map("shared_at") @db.Timestamptz()
 
   @@index([resourceType, resourceId])
   @@index([userId])
@@ -1682,25 +1696,25 @@ model ContentShare {
 /// Every search query made on the platform. Drives "what content do users
 /// actually want" analysis and zero-result detection.
 model SearchQueryLog {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  userId            String?  @map("user_id") @db.Uuid
-  user              User?    @relation(fields: [userId], references: [id])
-  visitorId         String?  @map("visitor_id")
+  userId    String? @map("user_id") @db.Uuid
+  user      User?   @relation(fields: [userId], references: [id])
+  visitorId String? @map("visitor_id")
 
-  query             String
-  locale            Locale
+  query  String
+  locale Locale
 
-  resultCount       Int      @map("result_count")
+  resultCount       Int     @map("result_count")
   /// If the user clicked a result, what was it?
-  clickedResultId   String?  @map("clicked_result_id") @db.Uuid
-  clickedResultType String?  @map("clicked_result_type")  // article / podcast_episode / ...
+  clickedResultId   String? @map("clicked_result_id") @db.Uuid
+  clickedResultType String? @map("clicked_result_type") // article / podcast_episode / ...
 
-  queriedAt         DateTime @default(now()) @map("queried_at") @db.Timestamptz()
+  queriedAt DateTime @default(now()) @map("queried_at") @db.Timestamptz()
 
   @@index([queriedAt])
   @@index([userId])
-  @@index([resultCount])  // for zero-result analysis
+  @@index([resultCount]) // for zero-result analysis
   @@map("search_query_logs")
 }
 
@@ -1719,29 +1733,29 @@ model SearchQueryLog {
 // ============================================================================
 
 model ArticleTranslationRevision {
-  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  translationId   String              @map("translation_id") @db.Uuid
-  translation     ArticleTranslation  @relation(fields: [translationId], references: [id], onDelete: Cascade)
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  translationId String             @map("translation_id") @db.Uuid
+  translation   ArticleTranslation @relation(fields: [translationId], references: [id], onDelete: Cascade)
 
   /// Monotonic version number, unique within (translation_id).
-  versionNumber   Int                 @map("version_number")
+  versionNumber Int @map("version_number")
 
   // Snapshot of the translation fields at the time of save
-  title           String
-  subtitle        String?
-  bodyMdx         String              @map("body_mdx") @db.Text
-  excerpt         String              @db.Text
-  seoTitle        String?             @map("seo_title")
-  seoDescription  String?             @map("seo_description")
+  title          String
+  subtitle       String?
+  bodyMdx        String  @map("body_mdx") @db.Text
+  excerpt        String  @db.Text
+  seoTitle       String? @map("seo_title")
+  seoDescription String? @map("seo_description")
 
   // Change context
-  editorId        String?             @map("editor_id") @db.Uuid
-  editor          User?               @relation(fields: [editorId], references: [id])
-  changeSummary   String?             @map("change_summary") @db.Text
+  editorId      String? @map("editor_id") @db.Uuid
+  editor        User?   @relation(fields: [editorId], references: [id])
+  changeSummary String? @map("change_summary") @db.Text
 
-  triggerType     RevisionTriggerType @map("trigger_type")
+  triggerType RevisionTriggerType @map("trigger_type")
 
-  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@unique([translationId, versionNumber])
   @@index([translationId, createdAt])
@@ -1774,31 +1788,31 @@ enum RevisionTriggerType {
 // ============================================================================
 
 model LegalDocument {
-  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  key                  LegalDocumentKey
-  locale               Locale
+  id     String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key    LegalDocumentKey
+  locale Locale
 
   /// Human version string ("v1.0", "2026-05-09", "summer-2026").
-  version              String
+  version String
 
-  title                String
-  bodyMdx              String                 @db.Text @map("body_mdx")
-  summary              String?                @db.Text
+  title   String
+  bodyMdx String  @map("body_mdx") @db.Text
+  summary String? @db.Text
 
   /// When this version becomes the active version for new acceptances.
-  effectiveAt          DateTime               @map("effective_at") @db.Timestamptz()
+  effectiveAt          DateTime @map("effective_at") @db.Timestamptz()
   /// Material changes require re-acceptance from existing users.
-  requiresReacceptance Boolean                @default(true) @map("requires_reacceptance")
+  requiresReacceptance Boolean  @default(true) @map("requires_reacceptance")
 
-  publishedAt          DateTime?              @map("published_at") @db.Timestamptz()
+  publishedAt DateTime? @map("published_at") @db.Timestamptz()
 
   /// Sha-256 of `body_mdx` at publish time; copied into each acceptance.
-  bodyHash             String                 @map("body_hash") @db.VarChar(64)
+  bodyHash String @map("body_hash") @db.VarChar(64)
 
-  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
-  acceptances          UserLegalAcceptance[]
+  acceptances UserLegalAcceptance[]
 
   @@unique([key, locale, version])
   @@index([key, locale, effectiveAt])
@@ -1820,25 +1834,25 @@ enum LegalDocumentKey {
 /// republished with `requires_reacceptance`, the user must accept again
 /// — a fresh row is written.
 model UserLegalAcceptance {
-  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId           String         @map("user_id") @db.Uuid
-  user             User           @relation(fields: [userId], references: [id])
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
 
-  legalDocumentId  String         @map("legal_document_id") @db.Uuid
-  legalDocument    LegalDocument  @relation(fields: [legalDocumentId], references: [id])
+  legalDocumentId String        @map("legal_document_id") @db.Uuid
+  legalDocument   LegalDocument @relation(fields: [legalDocumentId], references: [id])
 
   /// Where did the acceptance happen? signup / paywall_checkout /
   /// kyc_submission / live_join / republished_modal
-  context          String
+  context String
 
-  acceptedAt       DateTime       @default(now()) @map("accepted_at") @db.Timestamptz()
+  acceptedAt DateTime @default(now()) @map("accepted_at") @db.Timestamptz()
 
-  ipAddress        String?        @map("ip_address") @db.Inet
-  userAgent        String?        @map("user_agent")
+  ipAddress String? @map("ip_address") @db.Inet
+  userAgent String? @map("user_agent")
 
   /// Sha-256 of the body the user saw. Should equal legalDocument.bodyHash
   /// at the moment of acceptance; recorded here for audit reproducibility.
-  acceptedBodyHash String         @map("accepted_body_hash") @db.VarChar(64)
+  acceptedBodyHash String @map("accepted_body_hash") @db.VarChar(64)
 
   @@unique([userId, legalDocumentId])
   @@index([userId])
@@ -1855,21 +1869,21 @@ model UserLegalAcceptance {
 /// on NewsletterCampaign / NewsletterSend are denormalized aggregates;
 /// this is the source-of-truth detail.
 model NewsletterLinkClick {
-  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sendId          String          @map("send_id") @db.Uuid
-  send            NewsletterSend  @relation(fields: [sendId], references: [id], onDelete: Cascade)
+  id     String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sendId String         @map("send_id") @db.Uuid
+  send   NewsletterSend @relation(fields: [sendId], references: [id], onDelete: Cascade)
 
   /// The full URL the user clicked.
-  url             String          @db.Text
+  url     String  @db.Text
   /// Template-side identifier (e.g. "primary_cta", "footer_unsubscribe").
   /// Lets us compare A/B variants without parsing URLs.
-  linkKey         String?         @map("link_key")
+  linkKey String? @map("link_key")
 
-  ipAddress       String?         @map("ip_address") @db.Inet
-  userAgent       String?         @map("user_agent")
-  deviceType      String?         @map("device_type")
+  ipAddress  String? @map("ip_address") @db.Inet
+  userAgent  String? @map("user_agent")
+  deviceType String? @map("device_type")
 
-  clickedAt       DateTime        @default(now()) @map("clicked_at") @db.Timestamptz()
+  clickedAt DateTime @default(now()) @map("clicked_at") @db.Timestamptz()
 
   @@index([sendId, clickedAt])
   @@index([linkKey, clickedAt])
@@ -1890,53 +1904,53 @@ model NewsletterLinkClick {
 // ============================================================================
 
 model MediaAsset {
-  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  kind            MediaAssetKind
+  kind MediaAssetKind
 
   // Storage
-  storageProvider String          @default("cloudflare_r2") @map("storage_provider") // cloudflare_r2 / s3 / mux / external_url
-  storageKey      String          @map("storage_key")
+  storageProvider String  @default("cloudflare_r2") @map("storage_provider") // cloudflare_r2 / s3 / mux / external_url
+  storageKey      String  @map("storage_key")
   /// CDN-fronted public URL. Null for private assets.
-  publicUrl       String?         @map("public_url")
+  publicUrl       String? @map("public_url")
 
   // File metadata
-  contentType     String          @map("content_type")
-  fileSizeBytes   Int             @map("file_size_bytes")
-  checksumSha256  String?         @map("checksum_sha256") @db.VarChar(64)
+  contentType    String  @map("content_type")
+  fileSizeBytes  Int     @map("file_size_bytes")
+  checksumSha256 String? @map("checksum_sha256") @db.VarChar(64)
 
   // Image-specific (null for audio/video)
-  widthPx         Int?            @map("width_px")
-  heightPx        Int?            @map("height_px")
+  widthPx       Int?    @map("width_px")
+  heightPx      Int?    @map("height_px")
   /// LQIP — hex color
-  dominantColor   String?         @map("dominant_color") @db.VarChar(7)
+  dominantColor String? @map("dominant_color") @db.VarChar(7)
   /// LQIP — BlurHash string
-  blurhash        String?
+  blurhash      String?
 
   // Audio / video-specific
-  durationSeconds Int?            @map("duration_seconds")
+  durationSeconds Int? @map("duration_seconds")
 
   // Descriptive metadata
-  altText         String?         @map("alt_text")
-  caption         String?         @db.Text
-  credit          String?
+  altText String? @map("alt_text")
+  caption String? @db.Text
+  credit  String?
 
-  uploadedById    String?         @map("uploaded_by_id") @db.Uuid
-  uploadedBy      User?           @relation("MediaAssetUploader", fields: [uploadedById], references: [id])
+  uploadedById String? @map("uploaded_by_id") @db.Uuid
+  uploadedBy   User?   @relation("MediaAssetUploader", fields: [uploadedById], references: [id])
 
-  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
-  deletedAt       DateTime?       @map("deleted_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz()
 
-  usages          MediaAssetUsage[]
+  usages MediaAssetUsage[]
 
   // Inverse of hot-path FKs declared on other models
-  usersUsingAsAvatar         User[]            @relation("UserAvatar")
-  articlesUsingAsHero        Article[]         @relation("ArticleHeroImage")
-  podcastEpisodesUsingAsAudio       PodcastEpisode[] @relation("PodcastAudio")
-  podcastEpisodesUsingAsTranscript  PodcastEpisode[] @relation("PodcastTranscript")
-  authorsUsingAsAvatar       Author[]          @relation("AuthorAvatar")
-  liveStreamsUsingAsCover    LiveStream[]      @relation("LiveStreamCover")
+  usersUsingAsAvatar               User[]           @relation("UserAvatar")
+  articlesUsingAsHero              Article[]        @relation("ArticleHeroImage")
+  podcastEpisodesUsingAsAudio      PodcastEpisode[] @relation("PodcastAudio")
+  podcastEpisodesUsingAsTranscript PodcastEpisode[] @relation("PodcastTranscript")
+  authorsUsingAsAvatar             Author[]         @relation("AuthorAvatar")
+  liveStreamsUsingAsCover          LiveStream[]     @relation("LiveStreamCover")
 
   @@index([kind])
   @@index([storageKey])
@@ -1964,17 +1978,17 @@ enum MediaAssetKind {
 /// when you set `article.heroImageAssetId = X`, you ALSO write a usage
 /// row with role="hero_image". Removal works the same way.
 model MediaAssetUsage {
-  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  assetId       String     @map("asset_id") @db.Uuid
-  asset         MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  id      String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assetId String     @map("asset_id") @db.Uuid
+  asset   MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
-  resourceType  String     @map("resource_type")  // article / podcast_episode / live_stream / author / user
-  resourceId    String     @map("resource_id") @db.Uuid
+  resourceType String @map("resource_type") // article / podcast_episode / live_stream / author / user
+  resourceId   String @map("resource_id") @db.Uuid
 
   /// hero_image / audio_file / transcript / avatar / cover / og_image / ...
-  role          String
+  role String
 
-  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@unique([assetId, resourceType, resourceId, role])
   @@index([resourceType, resourceId])
@@ -1991,15 +2005,15 @@ model MediaAssetUsage {
 // ============================================================================
 
 model NotificationPreference {
-  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId      String              @map("user_id") @db.Uuid
-  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  channel     NotificationChannel
-  kind        NotificationKind
+  channel NotificationChannel
+  kind    NotificationKind
 
-  enabled     Boolean             @default(true)
-  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz()
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@unique([userId, channel, kind])
   @@index([userId])
@@ -2083,35 +2097,35 @@ enum BounceType {
 // ============================================================================
 
 model Coupon {
-  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code            String         @unique
-  name            String?
+  id   String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code String  @unique
+  name String?
 
   /// Discount: exactly one of percentOff or amountOffCents is set.
-  percentOff      Int?           @map("percent_off")        // 0-100
-  amountOffCents  Int?           @map("amount_off_cents")
-  currency        String         @default("USD")
+  percentOff     Int?   @map("percent_off") // 0-100
+  amountOffCents Int?   @map("amount_off_cents")
+  currency       String @default("USD")
 
-  duration        CouponDuration
+  duration       CouponDuration
   /// Required if duration = repeating
-  durationMonths  Int?           @map("duration_months")
+  durationMonths Int?           @map("duration_months")
 
   /// Restrict to specific plans (null = applies to any plan).
-  appliesToPlanKeys PlanKey[]    @map("applies_to_plan_keys")
+  appliesToPlanKeys PlanKey[] @map("applies_to_plan_keys")
 
-  maxRedemptions    Int?         @map("max_redemptions")
-  redeemedCount     Int          @default(0) @map("redeemed_count")
-  expiresAt         DateTime?    @map("expires_at") @db.Timestamptz()
+  maxRedemptions Int?      @map("max_redemptions")
+  redeemedCount  Int       @default(0) @map("redeemed_count")
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz()
 
   // Stripe linkage
-  stripeCouponId    String?      @unique @map("stripe_coupon_id")
+  stripeCouponId String? @unique @map("stripe_coupon_id")
 
-  active            Boolean      @default(true)
+  active Boolean @default(true)
 
-  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
-  redemptions       CouponRedemption[]
+  redemptions CouponRedemption[]
 
   @@index([active, expiresAt])
   @@map("coupons")
@@ -2126,17 +2140,17 @@ enum CouponDuration {
 }
 
 model CouponRedemption {
-  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  couponId        String        @map("coupon_id") @db.Uuid
-  coupon          Coupon        @relation(fields: [couponId], references: [id])
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  couponId String @map("coupon_id") @db.Uuid
+  coupon   Coupon @relation(fields: [couponId], references: [id])
 
-  userId          String        @map("user_id") @db.Uuid
-  user            User          @relation(fields: [userId], references: [id])
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
 
-  subscriptionId  String?       @map("subscription_id") @db.Uuid
-  subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
+  subscriptionId String?       @map("subscription_id") @db.Uuid
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
 
-  redeemedAt      DateTime      @default(now()) @map("redeemed_at") @db.Timestamptz()
+  redeemedAt DateTime @default(now()) @map("redeemed_at") @db.Timestamptz()
 
   @@unique([couponId, userId, subscriptionId])
   @@index([userId])
@@ -2154,22 +2168,22 @@ model CouponRedemption {
 // ============================================================================
 
 model ArticleReview {
-  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  articleId     String         @map("article_id") @db.Uuid
-  article       Article        @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId String  @map("article_id") @db.Uuid
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
-  reviewerId    String         @map("reviewer_id") @db.Uuid
-  reviewer      User           @relation("ArticleReviewer", fields: [reviewerId], references: [id])
+  reviewerId String @map("reviewer_id") @db.Uuid
+  reviewer   User   @relation("ArticleReviewer", fields: [reviewerId], references: [id])
 
-  reviewType    ReviewType     @map("review_type")
-  decision      ReviewDecision
+  reviewType ReviewType     @map("review_type")
+  decision   ReviewDecision
 
-  notes         String?        @db.Text
+  notes           String? @db.Text
   /// What article version was reviewed. Lets us tell whether a later edit
   /// invalidated this review and a re-review is required.
-  reviewedVersion Int          @map("reviewed_version")
+  reviewedVersion Int     @map("reviewed_version")
 
-  reviewedAt    DateTime       @default(now()) @map("reviewed_at") @db.Timestamptz()
+  reviewedAt DateTime @default(now()) @map("reviewed_at") @db.Timestamptz()
 
   @@index([articleId, reviewedAt])
   @@index([reviewerId])
@@ -2195,19 +2209,19 @@ enum ReviewDecision {
 /// Author's position in a security mentioned in an article. Mandatory
 /// disclosure for SEC compliance. Renders on the public article page.
 model EditorialPositionDisclosure {
-  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  articleId     String       @map("article_id") @db.Uuid
-  article       Article      @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId String  @map("article_id") @db.Uuid
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
-  authorId      String       @map("author_id") @db.Uuid
-  author        Author       @relation(fields: [authorId], references: [id])
+  authorId String @map("author_id") @db.Uuid
+  author   Author @relation(fields: [authorId], references: [id])
 
-  ticker        String       // "TSLA", "BTC", "USDCNH"
-  positionType  PositionType @map("position_type")
+  ticker       String // "TSLA", "BTC", "USDCNH"
+  positionType PositionType @map("position_type")
   /// Public disclosure text shown to readers.
-  disclosure    String       @db.Text
+  disclosure   String       @db.Text
 
-  disclosedAt   DateTime     @default(now()) @map("disclosed_at") @db.Timestamptz()
+  disclosedAt DateTime @default(now()) @map("disclosed_at") @db.Timestamptz()
 
   @@unique([articleId, authorId, ticker])
   @@index([articleId])
@@ -2231,24 +2245,24 @@ enum PositionType {
 
 /// Post-publication correction. Shown publicly with a "corrected on …" note.
 model ArticleErratum {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  articleId       String   @map("article_id") @db.Uuid
-  article         Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId String  @map("article_id") @db.Uuid
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
   /// Human description of what changed.
-  description     String   @db.Text
+  description   String  @db.Text
   /// Original (incorrect) text, if applicable.
-  originalText    String?  @map("original_text") @db.Text
+  originalText  String? @map("original_text") @db.Text
   /// Corrected text, if applicable.
-  correctedText   String?  @map("corrected_text") @db.Text
+  correctedText String? @map("corrected_text") @db.Text
 
-  postedById      String   @map("posted_by_id") @db.Uuid
-  postedBy        User     @relation("ErratumPostedBy", fields: [postedById], references: [id])
+  postedById String @map("posted_by_id") @db.Uuid
+  postedBy   User   @relation("ErratumPostedBy", fields: [postedById], references: [id])
 
   /// Show this correction on the article page (vs internal-only).
-  publiclyShown   Boolean  @default(true) @map("publicly_shown")
+  publiclyShown Boolean @default(true) @map("publicly_shown")
 
-  postedAt        DateTime @default(now()) @map("posted_at") @db.Timestamptz()
+  postedAt DateTime @default(now()) @map("posted_at") @db.Timestamptz()
 
   @@index([articleId, postedAt])
   @@map("article_errata")
@@ -2256,16 +2270,16 @@ model ArticleErratum {
 
 /// Citation for a fact / chart / quote in an article.
 model ArticleSource {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  articleId    String   @map("article_id") @db.Uuid
-  article      Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId String  @map("article_id") @db.Uuid
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
-  citation     String   // "Bloomberg, May 9 2026"
-  url          String?
-  accessedAt   DateTime? @map("accessed_at") @db.Timestamptz()
-  sortOrder    Int      @default(0) @map("sort_order")
+  citation   String // "Bloomberg, May 9 2026"
+  url        String?
+  accessedAt DateTime? @map("accessed_at") @db.Timestamptz()
+  sortOrder  Int       @default(0) @map("sort_order")
 
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@index([articleId])
   @@map("article_sources")
@@ -2290,21 +2304,21 @@ enum ComplianceClass {
 /// `revokedAt` when the user signs out or APNs/FCM returns an unregistered
 /// response.
 model DeviceToken {
-  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId      String         @map("user_id") @db.Uuid
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  platform    DevicePlatform
+  platform   DevicePlatform
   /// Opaque token from APNs / FCM / Web Push subscription endpoint.
-  token       String         @db.Text
+  token      String         @db.Text
   /// "Chris's iPhone 15 Pro" — set from device name where available.
-  deviceName  String?        @map("device_name")
-  appVersion  String?        @map("app_version")
-  osVersion   String?        @map("os_version")
+  deviceName String?        @map("device_name")
+  appVersion String?        @map("app_version")
+  osVersion  String?        @map("os_version")
 
-  enrolledAt  DateTime       @default(now()) @map("enrolled_at") @db.Timestamptz()
-  lastUsedAt  DateTime       @default(now()) @map("last_used_at") @db.Timestamptz()
-  revokedAt   DateTime?      @map("revoked_at") @db.Timestamptz()
+  enrolledAt DateTime  @default(now()) @map("enrolled_at") @db.Timestamptz()
+  lastUsedAt DateTime  @default(now()) @map("last_used_at") @db.Timestamptz()
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz()
 
   @@unique([platform, token])
   @@index([userId])
@@ -2324,28 +2338,28 @@ enum DevicePlatform {
 /// internal services. Plaintext token shown ONCE at creation; only the
 /// sha256 is persisted.
 model ApiToken {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name           String
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name String
 
   /// sha256(plaintext_token). Lookup by hash on every authenticated request.
-  tokenHash      String    @unique @map("token_hash") @db.VarChar(64)
+  tokenHash  String @unique @map("token_hash") @db.VarChar(64)
   /// Last 4 chars of plaintext for UI display ("…a3f2").
-  tokenLast4     String    @map("token_last4") @db.VarChar(4)
+  tokenLast4 String @map("token_last4") @db.VarChar(4)
 
   /// Postgres array of scope strings ("read:articles", "write:newsletter").
-  scopes         String[]
+  scopes String[]
 
-  createdById    String    @map("created_by_id") @db.Uuid
-  createdBy      User      @relation("ApiTokenCreator", fields: [createdById], references: [id])
+  createdById String @map("created_by_id") @db.Uuid
+  createdBy   User   @relation("ApiTokenCreator", fields: [createdById], references: [id])
 
   /// Optional rate limit in requests / minute. Null = no app-level cap.
-  rateLimitRpm   Int?      @map("rate_limit_rpm")
+  rateLimitRpm Int? @map("rate_limit_rpm")
 
-  expiresAt      DateTime? @map("expires_at") @db.Timestamptz()
-  lastUsedAt     DateTime? @map("last_used_at") @db.Timestamptz()
-  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz()
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz()
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz()
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz()
 
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@index([createdById])
   @@index([revokedAt])
@@ -2361,24 +2375,24 @@ model ApiToken {
 // ============================================================================
 
 model UserMfaFactor {
-  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId        String        @map("user_id") @db.Uuid
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  factorType    MfaFactorType @map("factor_type")
+  factorType MfaFactorType @map("factor_type")
   /// Human label ("YubiKey 5C", "iPhone Authenticator").
-  label         String?
+  label      String?
 
   /// TOTP secret (encrypted) OR WebAuthn credential public-key blob (raw,
   /// public-key only). For recovery_code rows, this holds the hashed code.
-  secretCipher  String        @map("secret_cipher") @db.Text
+  secretCipher String @map("secret_cipher") @db.Text
 
   /// For WebAuthn: credential ID + AAGUID + sign counter (encoded JSON).
-  metadata      Json?         @db.JsonB
+  metadata Json? @db.JsonB
 
-  enrolledAt    DateTime      @default(now()) @map("enrolled_at") @db.Timestamptz()
-  lastUsedAt    DateTime?     @map("last_used_at") @db.Timestamptz()
-  disabledAt    DateTime?     @map("disabled_at") @db.Timestamptz()
+  enrolledAt DateTime  @default(now()) @map("enrolled_at") @db.Timestamptz()
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz()
+  disabledAt DateTime? @map("disabled_at") @db.Timestamptz()
 
   @@index([userId, disabledAt])
   @@map("user_mfa_factors")
@@ -2388,7 +2402,7 @@ enum MfaFactorType {
   totp
   webauthn
   recovery_code
-  sms          // last resort, discouraged
+  sms // last resort, discouraged
 
   @@map("mfa_factor_type")
 }
@@ -2402,38 +2416,38 @@ enum MfaFactorType {
 // ============================================================================
 
 model AccountCredit {
-  userId          String   @id @map("user_id") @db.Uuid
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @id @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// Materialized aggregate of `account_credit_entries.change_cents`.
   /// App-layer hook updates this on every entry insert.
-  balanceCents    Int      @default(0) @map("balance_cents")
-  currency        String   @default("USD")
+  balanceCents Int    @default(0) @map("balance_cents")
+  currency     String @default("USD")
 
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@map("account_credits")
 }
 
 model AccountCreditEntry {
-  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId          String       @map("user_id") @db.Uuid
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
 
   /// Positive grants credit, negative debits it. Sum == AccountCredit.balanceCents.
-  changeCents     Int          @map("change_cents")
-  currency        String       @default("USD")
+  changeCents Int    @map("change_cents")
+  currency    String @default("USD")
 
-  reason          CreditReason
+  reason    CreditReason
   /// Optional FK to the invoice this entry funded (for debits).
-  invoiceId       String?      @map("invoice_id") @db.Uuid
+  invoiceId String?      @map("invoice_id") @db.Uuid
 
   /// Who created this entry (admin grants comp, system processes referral).
-  grantedById     String?      @map("granted_by_id") @db.Uuid
-  grantedBy       User?        @relation("CreditEntryGranter", fields: [grantedById], references: [id])
+  grantedById String? @map("granted_by_id") @db.Uuid
+  grantedBy   User?   @relation("CreditEntryGranter", fields: [grantedById], references: [id])
 
-  description     String?      @db.Text
+  description String? @db.Text
 
-  occurredAt      DateTime     @default(now()) @map("occurred_at") @db.Timestamptz()
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz()
 
   @@index([userId, occurredAt])
   @@index([reason])
@@ -2453,25 +2467,25 @@ enum CreditReason {
 }
 
 model Payout {
-  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId            String         @map("user_id") @db.Uuid
-  user              User           @relation("PayoutRecipient", fields: [userId], references: [id])
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation("PayoutRecipient", fields: [userId], references: [id])
 
-  amountCents       Int            @map("amount_cents")
-  currency          String         @default("USD")
+  amountCents Int    @map("amount_cents")
+  currency    String @default("USD")
 
-  provider          PayoutProvider
-  status            PayoutStatus
+  provider PayoutProvider
+  status   PayoutStatus
 
-  externalPayoutId  String?        @unique @map("external_payout_id")
+  externalPayoutId String? @unique @map("external_payout_id")
 
   /// Why this payout was created (referral_reward / affiliate_commission / ...).
-  reason            String?
+  reason String?
 
-  requestedAt       DateTime       @default(now()) @map("requested_at") @db.Timestamptz()
-  processedAt       DateTime?      @map("processed_at") @db.Timestamptz()
-  failedAt          DateTime?      @map("failed_at") @db.Timestamptz()
-  failureMessage    String?        @map("failure_message")
+  requestedAt    DateTime  @default(now()) @map("requested_at") @db.Timestamptz()
+  processedAt    DateTime? @map("processed_at") @db.Timestamptz()
+  failedAt       DateTime? @map("failed_at") @db.Timestamptz()
+  failureMessage String?   @map("failure_message")
 
   @@index([userId])
   @@index([status])
@@ -2482,7 +2496,7 @@ enum PayoutProvider {
   stripe_connect
   paypal
   wire_transfer
-  account_credit  // "pay back" by adding to in-platform balance
+  account_credit // "pay back" by adding to in-platform balance
 
   @@map("payout_provider")
 }
@@ -2502,39 +2516,39 @@ enum PayoutStatus {
 // ============================================================================
 
 model GiftSubscription {
-  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  purchaserId         String          @map("purchaser_id") @db.Uuid
-  purchaser           User            @relation("GiftPurchaser", fields: [purchaserId], references: [id])
+  purchaserId String @map("purchaser_id") @db.Uuid
+  purchaser   User   @relation("GiftPurchaser", fields: [purchaserId], references: [id])
 
-  recipientEmail      String          @db.Citext
-  recipientName       String?         @map("recipient_name")
-  giftMessage         String?         @map("gift_message") @db.Text
+  recipientEmail String  @db.Citext
+  recipientName  String? @map("recipient_name")
+  giftMessage    String? @map("gift_message") @db.Text
 
-  planId              String          @map("plan_id") @db.Uuid
-  billingInterval     BillingInterval @map("billing_interval")
+  planId          String          @map("plan_id") @db.Uuid
+  billingInterval BillingInterval @map("billing_interval")
 
   /// One-time charge captured up front via Stripe.
-  amountCents         Int             @map("amount_cents")
-  currency            String          @default("USD")
-  stripePaymentIntentId String?       @map("stripe_payment_intent_id")
+  amountCents           Int     @map("amount_cents")
+  currency              String  @default("USD")
+  stripePaymentIntentId String? @map("stripe_payment_intent_id")
 
   /// Random token sent in the redemption email.
-  redemptionToken     String          @unique @map("redemption_token")
-  redemptionUrl       String?         @map("redemption_url")
+  redemptionToken String  @unique @map("redemption_token")
+  redemptionUrl   String? @map("redemption_url")
 
   /// Optional scheduled delivery (birthdays, holidays).
-  scheduledDeliveryAt DateTime?       @map("scheduled_delivery_at") @db.Timestamptz()
-  deliveredAt         DateTime?       @map("delivered_at") @db.Timestamptz()
+  scheduledDeliveryAt DateTime? @map("scheduled_delivery_at") @db.Timestamptz()
+  deliveredAt         DateTime? @map("delivered_at") @db.Timestamptz()
 
-  redeemedAt          DateTime?       @map("redeemed_at") @db.Timestamptz()
-  redeemedByUserId    String?         @map("redeemed_by_user_id") @db.Uuid
-  redeemedByUser      User?           @relation("GiftRecipient", fields: [redeemedByUserId], references: [id])
+  redeemedAt       DateTime? @map("redeemed_at") @db.Timestamptz()
+  redeemedByUserId String?   @map("redeemed_by_user_id") @db.Uuid
+  redeemedByUser   User?     @relation("GiftRecipient", fields: [redeemedByUserId], references: [id])
 
   /// If the gift is never redeemed, when does it expire?
-  expiresAt           DateTime?       @map("expires_at") @db.Timestamptz()
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz()
 
-  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@index([purchaserId])
   @@index([recipientEmail])
@@ -2549,19 +2563,19 @@ model GiftSubscription {
 /// User signed up to attend (RSVP). Separate from LiveAttendance, which
 /// captures actual presence during the broadcast.
 model LiveRegistration {
-  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  liveStreamId    String     @map("live_stream_id") @db.Uuid
-  liveStream      LiveStream @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
-  userId          String     @map("user_id") @db.Uuid
-  user            User       @relation(fields: [userId], references: [id])
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveStreamId String     @map("live_stream_id") @db.Uuid
+  liveStream   LiveStream @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
+  userId       String     @map("user_id") @db.Uuid
+  user         User       @relation(fields: [userId], references: [id])
 
-  registeredAt    DateTime   @default(now()) @map("registered_at") @db.Timestamptz()
+  registeredAt   DateTime  @default(now()) @map("registered_at") @db.Timestamptz()
   /// Stamped when the "see you tomorrow" reminder is dispatched.
-  reminderSentAt  DateTime?  @map("reminder_sent_at") @db.Timestamptz()
+  reminderSentAt DateTime? @map("reminder_sent_at") @db.Timestamptz()
   /// User downloaded the .ics file or added to Google Calendar via OAuth.
-  calendarAdded   Boolean    @default(false) @map("calendar_added")
+  calendarAdded  Boolean   @default(false) @map("calendar_added")
 
-  canceledAt      DateTime?  @map("canceled_at") @db.Timestamptz()
+  canceledAt DateTime? @map("canceled_at") @db.Timestamptz()
 
   @@unique([liveStreamId, userId])
   @@index([userId])
@@ -2571,16 +2585,16 @@ model LiveRegistration {
 /// Chapter marker on a recorded live stream. Lets the replay UI render
 /// "jump to: 00:12:34 — Why the BOJ blink mattered".
 model LiveRecordingChapter {
-  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  liveStreamId      String     @map("live_stream_id") @db.Uuid
-  liveStream        LiveStream @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveStreamId String     @map("live_stream_id") @db.Uuid
+  liveStream   LiveStream @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
 
-  timestampSeconds  Int        @map("timestamp_seconds")
-  title             String
-  description       String?    @db.Text
-  sortOrder         Int        @default(0) @map("sort_order")
+  timestampSeconds Int     @map("timestamp_seconds")
+  title            String
+  description      String? @db.Text
+  sortOrder        Int     @default(0) @map("sort_order")
 
-  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   @@unique([liveStreamId, timestampSeconds])
   @@index([liveStreamId, timestampSeconds])
@@ -2596,14 +2610,14 @@ model LiveRecordingChapter {
 // ============================================================================
 
 model PlatformSetting {
-  key            String   @id            // canonical dotted key, e.g. "subscription.trial_days"
-  valueJson      Json     @db.JsonB @map("value_json")
+  key       String @id // canonical dotted key, e.g. "subscription.trial_days"
+  valueJson Json   @map("value_json") @db.JsonB
 
-  description    String?  @db.Text
-  updatedById    String?  @map("updated_by_id") @db.Uuid
-  updatedBy      User?    @relation("SettingUpdatedBy", fields: [updatedById], references: [id])
+  description String? @db.Text
+  updatedById String? @map("updated_by_id") @db.Uuid
+  updatedBy   User?   @relation("SettingUpdatedBy", fields: [updatedById], references: [id])
 
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@map("platform_settings")
 }
@@ -2617,23 +2631,23 @@ model PlatformSetting {
 // ============================================================================
 
 model ArticleDailyMetric {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  articleId       String   @map("article_id") @db.Uuid
-  article         Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  articleId String  @map("article_id") @db.Uuid
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
   /// Day boundary in UTC (midnight).
-  date            DateTime @db.Date
+  date DateTime @db.Date
 
-  views               Int  @default(0)
-  uniqueViewers       Int  @default(0) @map("unique_viewers")
-  paywalledViews      Int  @default(0) @map("paywalled_views")
-  completions         Int  @default(0)
-  avgTimeSeconds      Int  @default(0) @map("avg_time_seconds")
-  bookmarkCount       Int  @default(0) @map("bookmark_count")
-  reactionCount       Int  @default(0) @map("reaction_count")
-  shareCount          Int  @default(0) @map("share_count")
+  views          Int @default(0)
+  uniqueViewers  Int @default(0) @map("unique_viewers")
+  paywalledViews Int @default(0) @map("paywalled_views")
+  completions    Int @default(0)
+  avgTimeSeconds Int @default(0) @map("avg_time_seconds")
+  bookmarkCount  Int @default(0) @map("bookmark_count")
+  reactionCount  Int @default(0) @map("reaction_count")
+  shareCount     Int @default(0) @map("share_count")
 
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@unique([articleId, date])
   @@index([date])
@@ -2641,27 +2655,27 @@ model ArticleDailyMetric {
 }
 
 model PodcastEpisodeDailyMetric {
-  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  episodeId         String         @map("episode_id") @db.Uuid
-  episode           PodcastEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  episodeId String         @map("episode_id") @db.Uuid
+  episode   PodcastEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
-  date              DateTime       @db.Date
+  date DateTime @db.Date
 
-  plays                Int  @default(0)
-  uniqueListeners      Int  @default(0) @map("unique_listeners")
-  completions          Int  @default(0)
-  downloads            Int  @default(0)
-  avgListenSeconds     Int  @default(0) @map("avg_listen_seconds")
+  plays            Int @default(0)
+  uniqueListeners  Int @default(0) @map("unique_listeners")
+  completions      Int @default(0)
+  downloads        Int @default(0)
+  avgListenSeconds Int @default(0) @map("avg_listen_seconds")
 
   /// Distribution channel breakdown.
-  webPlays             Int  @default(0) @map("web_plays")
-  iosPlays             Int  @default(0) @map("ios_plays")
-  androidPlays         Int  @default(0) @map("android_plays")
-  applePodcastsPlays   Int  @default(0) @map("apple_podcasts_plays")
-  spotifyPlays         Int  @default(0) @map("spotify_plays")
-  otherPlays           Int  @default(0) @map("other_plays")
+  webPlays           Int @default(0) @map("web_plays")
+  iosPlays           Int @default(0) @map("ios_plays")
+  androidPlays       Int @default(0) @map("android_plays")
+  applePodcastsPlays Int @default(0) @map("apple_podcasts_plays")
+  spotifyPlays       Int @default(0) @map("spotify_plays")
+  otherPlays         Int @default(0) @map("other_plays")
 
-  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@unique([episodeId, date])
   @@index([date])
