@@ -24,6 +24,11 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
+  // `native` covers the dev box (Darwin / Linux). `rhel-openssl-3.0.x` is
+  // what Vercel's Node 20 serverless runtime needs — without this, Next's
+  // bundler can't find the query engine binary at request time and every
+  // DB call throws PrismaClientInitializationError.
+  binaryTargets   = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
