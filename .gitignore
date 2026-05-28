@@ -14,6 +14,10 @@ build/
 .env.local
 .env.*.local
 
+# Local-only notes / credentials
+DEMO_CREDENTIALS.local.md
+*.local.md
+
 # OS / editor
 .DS_Store
 .vscode/

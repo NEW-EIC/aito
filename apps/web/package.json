@@ -5,7 +5,7 @@
   "description": "AITO · Alto web app — Next.js 15 + TS + Tailwind + next-intl.",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
