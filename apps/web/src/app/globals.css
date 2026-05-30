@@ -236,3 +236,61 @@ html[lang^="zh"] body { line-height: 1.75; }
   height: 0;
   pointer-events: none;
 }
+
+/* ─── TipTap Image resize handles ─────────────────────────────────────
+   Built-in Image extension's `resize` option wraps the <img> in a
+   wrapper with [data-resize-wrapper=""] and 4 corner handles with
+   [data-resize-handle="top-left"] etc. We style the handles to match
+   the rest of the admin surface (small squares with brand fg-colour
+   border + bg) — same pattern WeChat editor uses for drag-corner
+   equal-proportion scaling. */
+
+.tiptap-editor [data-resize-wrapper] {
+  /* The wrapper inherits the alignment from the parent paragraph; show
+     a soft outline when the image is selected so it's obvious the
+     handles are part of this element. */
+  display: inline-block;
+  max-width: 100%;
+}
+
+.tiptap-editor [data-resize-wrapper]:hover,
+.tiptap-editor [data-resize-wrapper]:focus-within {
+  outline: 2px solid rgba(0, 0, 0, 0.15);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.tiptap-editor [data-resize-handle] {
+  width: 12px;
+  height: 12px;
+  background: var(--bg, #fff);
+  border: 2px solid var(--fg, #111);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 2;
+}
+
+/* Show handles on hover / focus only — keeps the editor calm when not
+   interacting with an image. */
+.tiptap-editor [data-resize-wrapper]:hover [data-resize-handle],
+.tiptap-editor [data-resize-wrapper]:focus-within [data-resize-handle] {
+  opacity: 1;
+}
+
+/* Per-corner cursor hints. The position itself is set inline by
+   TipTap's positionHandle — we only override the cursor. */
+.tiptap-editor [data-resize-handle="top-left"],
+.tiptap-editor [data-resize-handle="bottom-right"] {
+  cursor: nwse-resize;
+}
+.tiptap-editor [data-resize-handle="top-right"],
+.tiptap-editor [data-resize-handle="bottom-left"] {
+  cursor: nesw-resize;
+}
+
+/* While dragging, dim everything outside the handle so the editor
+   doesn't accidentally trigger selection. */
+.tiptap-editor [data-resize-wrapper].is-resizing {
+  user-select: none;
+}

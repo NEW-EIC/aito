@@ -174,6 +174,18 @@ export function Editor({
           class: "tiptap-image",
           loading: "lazy",
         },
+        // Equal-proportion corner drag — same shape WeChat editor uses.
+        // 4 diagonal handles only (no top/right/bottom/left mid-edges
+        // because aspect ratio is locked; mid-edges would constrain one
+        // axis and feel broken). Aspect ratio always preserved so an
+        // editor can't accidentally squash an image.
+        resize: {
+          enabled: true,
+          directions: ["top-left", "top-right", "bottom-left", "bottom-right"],
+          minWidth: 64,
+          minHeight: 64,
+          alwaysPreserveAspectRatio: true,
+        },
       }),
       Placeholder.configure({
         placeholder: placeholder ?? "",
