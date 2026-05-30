@@ -1149,10 +1149,38 @@
             "internal": "服务端出错,请稍后重试。"
           }
         },
+        "toolbar": {
+          "bold": "加粗",
+          "italic": "斜体",
+          "underline": "下划线",
+          "strike": "删除线",
+          "code": "行内代码",
+          "h2": "二级标题",
+          "h3": "三级标题",
+          "bulletList": "无序列表",
+          "orderedList": "有序列表",
+          "blockquote": "引用",
+          "divider": "分隔线",
+          "link": "链接",
+          "unlink": "移除链接",
+          "alignLeft": "左对齐",
+          "alignCenter": "居中",
+          "alignRight": "右对齐",
+          "color": "字体颜色",
+          "highlight": "背景高亮",
+          "undo": "撤销",
+          "redo": "重做",
+          "codeBlock": "代码块",
+          "linkPrompt": "链接 URL"
+        },
         "translations": {
           "addTranslation": "添加翻译",
           "version": "版本",
-          "tiptapComingSoon": "富文本编辑器将在第 5 天上线。当前为纯文本框 — 粘贴 HTML 会按字面在公众站点呈现。",
+          "autosave": {
+            "idle": "已开启自动保存,停止输入 2 秒后自动保存。",
+            "saving": "保存中…",
+            "failed": "自动保存失败,请点击\"保存翻译\"重试。"
+          },
           "picker": {
             "heading": "语言",
             "cancel": "取消",

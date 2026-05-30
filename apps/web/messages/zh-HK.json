@@ -1149,10 +1149,38 @@
             "internal": "伺服器出咗錯,請稍後再試。"
           }
         },
+        "toolbar": {
+          "bold": "加粗",
+          "italic": "斜體",
+          "underline": "底線",
+          "strike": "刪除線",
+          "code": "行內程式碼",
+          "h2": "二級標題",
+          "h3": "三級標題",
+          "bulletList": "項目符號",
+          "orderedList": "編號清單",
+          "blockquote": "引用",
+          "divider": "分隔線",
+          "link": "連結",
+          "unlink": "移除連結",
+          "alignLeft": "左對齊",
+          "alignCenter": "置中",
+          "alignRight": "右對齊",
+          "color": "字體色",
+          "highlight": "背景高亮",
+          "undo": "復原",
+          "redo": "重做",
+          "codeBlock": "程式碼區塊",
+          "linkPrompt": "連結 URL"
+        },
         "translations": {
           "addTranslation": "新增翻譯",
           "version": "版本",
-          "tiptapComingSoon": "富文本編輯器會喺第 5 日上線。目前係純文本框 — 貼 HTML 會按字面喺公眾站台顯示。",
+          "autosave": {
+            "idle": "已開啟自動保存,停止輸入 2 秒後自動保存。",
+            "saving": "保存中…",
+            "failed": "自動保存失敗,請撳「保存翻譯」重試。"
+          },
           "picker": {
             "heading": "語言",
             "cancel": "取消",

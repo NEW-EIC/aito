@@ -913,3 +913,154 @@ Manual smoke (against local docker DB):
   / lists / link / alignment / color / highlight. Autosave
   with 2s debounce. Editor output is HTML, written into
   `ArticleTranslation.bodyMdx` (legacy column name) verbatim.
+
+---
+
+### Day 5 — 2026-05-30 — TipTap WYSIWYG + autosave
+
+Closes: "Can I write a paragraph?"
+
+**Shipped**
+
+Dependencies (10 new packages):
+
+- `@tiptap/react` `@tiptap/pm` `@tiptap/starter-kit`
+- Extensions: `text-align`, `text-style`, `color`, `highlight`,
+  `placeholder` (+ `link`, `underline` are redundant — StarterKit
+  v3 already bundles them, kept as explicit deps for the lock
+  file so we know what's installed)
+
+Components:
+
+- `apps/web/src/components/admin/editor/Editor.tsx` — TipTap
+  wrapper. `useEditor` config: StarterKit (heading levels
+  restricted to H2/H3; link configured with
+  `openOnClick: false` + `noopener noreferrer target="_blank"`;
+  codeBlock and blockquote get custom HTMLAttributes classes),
+  TextStyle + Color, Highlight with `multicolor: true`, TextAlign
+  for heading + paragraph, Placeholder.
+  `immediatelyRender: false` because Next 15 SSR will throw a
+  hydration mismatch with a hot-rendered editor otherwise.
+  Forwards `onChange` through a ref to avoid re-instantiating
+  the editor on every parent render. Reacts to external
+  `initialHTML` resets via `setContent(html, { emitUpdate: false })`
+  without firing a fake update.
+- `apps/web/src/components/admin/editor/Toolbar.tsx` — 21 buttons
+  in 6 groups separated by vertical dividers: inline marks
+  (bold/italic/underline/strike/inline code) → blocks
+  (H2/H3/bullet/ordered/blockquote/codeBlock/divider) →
+  alignment (left/center/right) → link/unlink → colour + highlight
+  pickers (popover via native `<details>`) → history
+  (undo/redo). Active state via `editor.isActive(...)` with
+  custom attribute matchers for textAlign. Disabled state on
+  undo/redo via `editor.can().undo()`. Link button prompts for
+  URL, supports unset on empty input. ColourSwatches has 7
+  presets + clear; HighlightSwatches has 4 yellow/green/blue/
+  pink + clear.
+
+Styles (`apps/web/src/app/globals.css`):
+
+- New `.tiptap-editor` block: H2 / H3 in Editorial New display
+  font, paragraph 1.7 line-height, lists with disc/decimal,
+  left-bar blockquote, soft-grey code blocks, full-bleed images
+  centered with max-width 100%, mark backgrounds rounded.
+  Placeholder `.is-editor-empty::before` rule. Same block will
+  be reused by the public article renderer on Day 6 when the
+  `<SanitizedArticleBody>` component lands.
+
+TranslationEditor changes:
+
+- Replaced the body textarea with `<Editor>`. Toolbar labels
+  + autosave labels passed in via the existing `labels` prop tree.
+- `tiptapComingSoon` label deleted (no longer relevant); replaced
+  with an autosave status strip under the editor.
+- Extracted save logic into `saveNow({ silent?: boolean })` that
+  both the manual Save button and the autosave debounce call.
+- Autosave: `useEffect` watching all 6 field values + dirty
+  flag. Debounces 2s of inactivity, then calls
+  `saveNow({ silent: true })`. Skips when title is empty
+  (server would reject), when not dirty, or when an explicit
+  save is already in progress.
+- `valuesRef` ref pattern: latest snapshot of all fields mirrored
+  into a ref so the debounce closure always reads fresh state
+  without restarting the timer.
+- New `autosaveState` state ("idle" / "saving" / "failed") with
+  inline status text under the editor.
+
+i18n: 22 new `admin.articles.edit.toolbar.*` keys per locale +
+3 `admin.articles.edit.translations.autosave.*` keys per locale.
+All three locales done by hand.
+
+**Verifies**
+
+- `pnpm --filter @aito/web type-check` → clean
+- `pnpm --filter @aito/web test` → 71 passing (no new tests
+  today; editor behaviour will be E2E-tested on Day 10)
+- `pnpm --filter @aito/web build` → green. Edit route bundle
+  jumped from 6.84 kB → 132 kB. That's TipTap + 6 extensions +
+  ProseMirror; per-route, so the rest of the admin surface and
+  the public site don't pay for it.
+
+Manual smoke (against local docker DB):
+
+1. `pnpm web:dev`, sign in as `demo-admin@aito.io`
+2. /en/admin/articles → click a seed article → Translations
+3. Type into the body editor → status flips to "Saving..." after
+   2 seconds, then back to idle
+4. Toolbar buttons all work; active state flips for the cursor's
+   current marks/blocks
+5. SEO collapse still works; manual Save still works; version
+   bumps; SaveIndicator goes green
+6. Verify autosave fail path: temporarily kill the dev server,
+   type more → status shows "Autosave failed" in red
+
+**Decisions**
+
+- **TipTap v3 over v2.** v3 ships `defineExtension` and improved
+  TS inference; StarterKit grew to bundle Underline + Link +
+  Strike + History. Smaller dependency tree per consumer.
+- **`immediatelyRender: false` is required for Next SSR.** Without
+  it, useEditor renders during the first server pass and the
+  client gets a hydration mismatch because the editor produces
+  random IDs. TipTap 3 default is `true` to suit Vite — we
+  override.
+- **No HTML sanitiser today.** TipTap can only produce HTML that
+  matches its loaded schema, so paste sanitisation is effectively
+  automatic for typed/keystroke content. Pasted HTML from
+  external sources gets stripped by ProseMirror's paste handler
+  down to schema-allowed nodes. Defense-in-depth via DOMPurify
+  lands on Day 6 to cover the public renderer too.
+- **`@tiptap/extension-text-style` exports `TextStyle` as a named
+  export, not default, in v3.** Caught by type-check. Documented
+  here because v2 used a default export and StackOverflow answers
+  haven't caught up yet.
+- **No autosave conflict with manual save.** If the editor types
+  fast enough to trigger autosave but then clicks Save before the
+  2s timer fires, the manual save runs first (sets `busy`), and
+  the debounce effect short-circuits on `if (busy) return`. No
+  double-write.
+- **`valuesRef` pattern.** Listing every field state in the effect
+  deps is necessary to re-trigger the debounce on each keystroke.
+  But the closure inside `setTimeout` should read the *latest*
+  values, not the values captured when the timer was scheduled.
+  The ref keeps the closure cheap and the values current.
+- **Save indicator stays. Autosave status is separate.** The
+  green/amber `<SaveIndicator>` reflects whether the form is
+  clean vs dirty — long-lived state. The autosave strip under
+  the editor reflects what's happening right now — ephemeral.
+  Two signals because they answer different questions ("am I
+  safe to close the tab?" vs "is the save in flight?").
+- **Colour palette is 7 swatches; highlight is 4.** Phase A
+  defaults; Phase B can swap for a full hex/rgb picker once
+  editors actually need it.
+- **`<details>` for popovers.** A11y-good with no JS, click-
+  outside via a tiny `closeNearestDetails()` helper. Phase B may
+  move to a proper Popover primitive if editors complain about
+  styling.
+
+**Carry-over**
+
+- Day 6: DOMPurify config + paste-from-WeChat / web / Word
+  smoothing + "Copy from another locale" button + font/spacing
+  presets + first-line indent. Public article renderer also
+  consumes the same sanitiser when rendering bodies.

@@ -74,6 +74,7 @@ export default async function EditArticlePage({
   const t = await getTranslations("admin.articles.edit");
   const tForm = await getTranslations("admin.articles.edit.form");
   const tTabs = await getTranslations("admin.articles.edit.translations");
+  const tToolbar = await getTranslations("admin.articles.edit.toolbar");
 
   // Translate DB locales → UI locale strings the form components speak.
   const existingTranslations = article.translations
@@ -226,7 +227,35 @@ export default async function EditArticlePage({
               saved: tForm("saved"),
               unsaved: tForm("unsaved"),
               version: tTabs("version"),
-              tiptapComingSoon: tTabs("tiptapComingSoon"),
+              toolbar: {
+                bold: tToolbar("bold"),
+                italic: tToolbar("italic"),
+                underline: tToolbar("underline"),
+                strike: tToolbar("strike"),
+                code: tToolbar("code"),
+                h2: tToolbar("h2"),
+                h3: tToolbar("h3"),
+                bulletList: tToolbar("bulletList"),
+                orderedList: tToolbar("orderedList"),
+                blockquote: tToolbar("blockquote"),
+                divider: tToolbar("divider"),
+                link: tToolbar("link"),
+                unlink: tToolbar("unlink"),
+                alignLeft: tToolbar("alignLeft"),
+                alignCenter: tToolbar("alignCenter"),
+                alignRight: tToolbar("alignRight"),
+                color: tToolbar("color"),
+                highlight: tToolbar("highlight"),
+                undo: tToolbar("undo"),
+                redo: tToolbar("redo"),
+                codeBlock: tToolbar("codeBlock"),
+                linkPrompt: tToolbar("linkPrompt"),
+              },
+              autosave: {
+                idle: tTabs("autosave.idle"),
+                saving: tTabs("autosave.saving"),
+                failed: tTabs("autosave.failed"),
+              },
               errors: {
                 validation: tForm("errors.validation"),
                 titleRequired: tTabs("errors.titleRequired"),

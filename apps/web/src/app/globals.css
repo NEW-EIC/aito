@@ -137,3 +137,102 @@ html[lang^="zh"] body { line-height: 1.75; }
     scroll-behavior: auto !important;
   }
 }
+
+/* ─── TipTap editor content ────────────────────────────────────────────
+   Scoped styles for both the admin WYSIWYG (`.tiptap-editor`) and the
+   public article body (will share `.article-body` when Day 6 adds the
+   sanitised renderer). Kept deliberately minimal — colours come from
+   inline marks the editor sets directly. */
+
+.tiptap-editor h2 {
+  font-family: var(--font-display, "Editorial New", Georgia, serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 1.75em;
+  margin-bottom: 0.4em;
+}
+.tiptap-editor h3 {
+  font-family: var(--font-display, "Editorial New", Georgia, serif);
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.35em;
+}
+.tiptap-editor p {
+  margin-top: 0.6em;
+  margin-bottom: 0.6em;
+  line-height: 1.7;
+}
+.tiptap-editor a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.tiptap-editor ul,
+.tiptap-editor ol {
+  margin: 0.8em 0;
+  padding-left: 1.6em;
+}
+.tiptap-editor ul { list-style-type: disc; }
+.tiptap-editor ol { list-style-type: decimal; }
+.tiptap-editor li {
+  margin: 0.25em 0;
+}
+.tiptap-editor li > p {
+  margin: 0;
+}
+.tiptap-editor .tiptap-blockquote,
+.tiptap-editor blockquote {
+  margin: 1.2em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--fg-muted, #888);
+  color: var(--fg-muted, #555);
+  font-style: italic;
+}
+.tiptap-editor code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+}
+.tiptap-editor .tiptap-codeblock,
+.tiptap-editor pre {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.8em 1em;
+  border-radius: 6px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.85em;
+  line-height: 1.5;
+  margin: 1em 0;
+  overflow-x: auto;
+}
+.tiptap-editor .tiptap-codeblock code,
+.tiptap-editor pre code {
+  background: transparent;
+  padding: 0;
+}
+.tiptap-editor hr {
+  margin: 2em 0;
+  border: none;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+.tiptap-editor img {
+  max-width: 100%;
+  margin: 1em auto;
+  border-radius: 4px;
+}
+.tiptap-editor mark {
+  border-radius: 2px;
+  padding: 0 0.1em;
+}
+
+/* TipTap placeholder shown when the editor is empty. */
+.tiptap-editor .is-editor-empty::before {
+  content: attr(data-placeholder);
+  color: var(--fg-soft, #999);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

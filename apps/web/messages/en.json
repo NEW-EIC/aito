@@ -1149,10 +1149,38 @@
             "internal": "Something went wrong on our end. Try again in a moment."
           }
         },
+        "toolbar": {
+          "bold": "Bold",
+          "italic": "Italic",
+          "underline": "Underline",
+          "strike": "Strikethrough",
+          "code": "Inline code",
+          "h2": "Heading 2",
+          "h3": "Heading 3",
+          "bulletList": "Bullet list",
+          "orderedList": "Numbered list",
+          "blockquote": "Quote",
+          "divider": "Divider",
+          "link": "Link",
+          "unlink": "Remove link",
+          "alignLeft": "Align left",
+          "alignCenter": "Align center",
+          "alignRight": "Align right",
+          "color": "Text color",
+          "highlight": "Highlight",
+          "undo": "Undo",
+          "redo": "Redo",
+          "codeBlock": "Code block",
+          "linkPrompt": "Link URL"
+        },
         "translations": {
           "addTranslation": "Add translation",
           "version": "Version",
-          "tiptapComingSoon": "Rich-text editor lands on Day 5. For now this is a plain textarea — HTML you paste here will render literally on the public site.",
+          "autosave": {
+            "idle": "Autosave on. Changes save 2 seconds after you stop typing.",
+            "saving": "Saving…",
+            "failed": "Autosave failed. Click \"Save translation\" to retry."
+          },
           "picker": {
             "heading": "Language",
             "cancel": "Cancel",

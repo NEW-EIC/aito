@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Loader2, Plus, AlertCircle } from "lucide-react";
 import {
   updateTranslationAction,
@@ -10,6 +10,8 @@ import {
   type AddTranslationResult,
 } from "@/app/[locale]/admin/articles/_actions";
 import { SaveIndicator } from "./SaveIndicator";
+import { Editor } from "./editor/Editor";
+import type { ToolbarLabels } from "./editor/Toolbar";
 
 export interface ExistingTranslation {
   locale: string;
@@ -44,12 +46,13 @@ interface Labels {
     seoDescription: string;
     seoDescriptionHelp: string;
   };
+  toolbar: ToolbarLabels;
+  autosave: { idle: string; saving: string; failed: string };
   save: string;
   saving: string;
   saved: string;
   unsaved: string;
   version: string;
-  tiptapComingSoon: string;
   errors: {
     validation: string;
     titleRequired: string;
@@ -342,6 +345,17 @@ function TranslationEditor({
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof UpdateTranslationInput, string>>
   >({});
+  const [autosaveState, setAutosaveState] =
+    useState<"idle" | "saving" | "failed">("idle");
+
+  // Mirror the latest snapshot of all fields in a ref so the autosave
+  // debounce closure always reads fresh values without recreating itself.
+  const valuesRef = useRef({
+    title, subtitle, excerpt, body, seoTitle, seoDescription,
+  });
+  useEffect(() => {
+    valuesRef.current = { title, subtitle, excerpt, body, seoTitle, seoDescription };
+  });
 
   const dirty = useMemo(() => {
     return (
@@ -356,26 +370,49 @@ function TranslationEditor({
     title, subtitle, excerpt, body, seoTitle, seoDescription, initial,
   ]);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setTopError(null);
-    setFieldErrors({});
+  // The shared save routine, used by both the explicit submit button and
+  // the autosave debounce. Returns true on success so callers can decide
+  // whether to display the result.
+  async function saveNow(opts: { silent?: boolean } = {}): Promise<boolean> {
+    if (!opts.silent) {
+      setBusy(true);
+      setTopError(null);
+      setFieldErrors({});
+    } else {
+      setAutosaveState("saving");
+    }
+
+    const v = valuesRef.current;
+    // Title is required server-side. Skip the round-trip if it's empty
+    // on an autosave attempt — the editor is mid-edit and a 400 would
+    // just flash an error.
+    if (!v.title.trim()) {
+      if (opts.silent) setAutosaveState("idle");
+      else {
+        setFieldErrors({ title: labels.errors.titleRequired });
+        setBusy(false);
+      }
+      return false;
+    }
 
     const payload: UpdateTranslationInput = {
       articleId,
       locale: initial.locale as "en" | "zh-CN" | "zh-HK",
-      title: title.trim(),
-      subtitle,
-      excerpt,
-      body,
-      seoTitle,
-      seoDescription,
+      title: v.title.trim(),
+      subtitle: v.subtitle,
+      excerpt: v.excerpt,
+      body: v.body,
+      seoTitle: v.seoTitle,
+      seoDescription: v.seoDescription,
     };
 
     const result: UpdateTranslationResult = await updateTranslationAction(payload);
 
     if (!result.ok) {
+      if (opts.silent) {
+        setAutosaveState("failed");
+        return false;
+      }
       if (result.code === "validation" && result.fieldErrors) {
         const mapped: Partial<Record<keyof UpdateTranslationInput, string>> = {};
         for (const [key, errCode] of Object.entries(result.fieldErrors)) {
@@ -395,11 +432,12 @@ function TranslationEditor({
         setTopError(labels.errors.internal);
       }
       setBusy(false);
-      return;
+      return false;
     }
 
     setSavedAt(result.savedAt);
-    setBusy(false);
+    setAutosaveState("idle");
+    if (!opts.silent) setBusy(false);
     onSaved({
       ...initial,
       title: payload.title,
@@ -411,7 +449,28 @@ function TranslationEditor({
       updatedAt: result.savedAt,
       version: initial.version + 1,
     });
+    return true;
   }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await saveNow();
+  }
+
+  // Autosave: when dirty, debounce 2s of inactivity then push silently.
+  // Cancels itself on every keystroke and on unmount.
+  useEffect(() => {
+    if (!dirty) return;
+    if (busy) return; // explicit save in progress — don't queue alongside
+    const handle = setTimeout(() => {
+      void saveNow({ silent: true });
+    }, 2000);
+    return () => clearTimeout(handle);
+    // We intentionally exclude saveNow from deps — it's stable enough for
+    // a debounce ref pattern and listing the field values is what should
+    // actually re-trigger the timer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, subtitle, excerpt, body, seoTitle, seoDescription, dirty, busy]);
 
   return (
     <form onSubmit={onSubmit} className="mt-6 space-y-5" noValidate>
@@ -482,16 +541,22 @@ function TranslationEditor({
         <label className="mb-1.5 block text-sm font-medium text-fg">
           {labels.fields.body}
         </label>
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
+        <Editor
+          initialHTML={initial.body}
+          onChange={setBody}
           placeholder={labels.fields.bodyPlaceholder}
-          rows={16}
-          className={`${TEXTAREA_CLASS} font-mono text-xs leading-relaxed`}
+          toolbarLabels={labels.toolbar}
+          disabled={busy}
         />
-        <p className="mt-1.5 text-xs text-fg-soft italic">
-          {labels.tiptapComingSoon}
-        </p>
+        <div className="mt-1.5 flex items-center justify-between text-xs">
+          <p className="text-fg-soft">
+            {autosaveState === "saving"
+              ? labels.autosave.saving
+              : autosaveState === "failed"
+                ? <span className="text-rose-600 dark:text-rose-400">{labels.autosave.failed}</span>
+                : labels.autosave.idle}
+          </p>
+        </div>
       </div>
 
       <details className="rounded-md border border-border bg-bg-alt/30 p-3 text-sm">
