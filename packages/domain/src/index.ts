@@ -3,6 +3,7 @@
  *
  * Single source of truth for:
  *   - subscription state machine
+ *   - article editorial state machine
  *   - paywall rule engine
  *   - app-side entitlement model
  *
@@ -18,6 +19,16 @@ export {
   type SubscriptionTier,
   type SubscriptionEvent,
 } from "./subscription";
+
+export {
+  articleTransition,
+  allowedEvents as allowedArticleEvents,
+  isPublic as isArticlePublic,
+  IllegalArticleTransitionError,
+  type Article,
+  type ArticleState,
+  type ArticleEvent,
+} from "./article";
 
 export {
   checkAccess,

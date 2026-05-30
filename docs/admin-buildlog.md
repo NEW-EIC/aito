@@ -479,3 +479,95 @@ Manual smoke (against local docker DB):
 | `demo-premium@aito.io` | `DemoPremium2026!` | Premium reader              |
 | `demo-pro@aito.io`     | `DemoPro2026!`   | Pro reader                   |
 | `demo-admin@aito.io`   | `DemoAdmin2026!` | Editorial admin (super_admin) |
+
+---
+
+### Day 2 — 2026-05-29 — Article state machine in `@aito/domain`
+
+Closes: "What transitions are legal?"
+
+**Shipped**
+
+- `packages/domain/src/article.ts` — pure-TS state machine
+  mirroring the shape of `subscription.ts`. Exports:
+  `ArticleState` (full 6-state union matching the Prisma enum
+  one-to-one — no mapping layer between domain and DB),
+  `ArticleEvent` (4 events: `publish` / `unpublish` / `archive`
+  / `unarchive`), `Article` interface (id + state + optional
+  publishedAt + archivedAt), `articleTransition()`,
+  `allowedEvents()` for UI button rendering, `isPublic()`, and
+  `IllegalArticleTransitionError` (carries `from` + `event` for
+  audit log clarity).
+- `packages/domain/src/__tests__/article.test.ts` — 33 unit
+  tests across six describe blocks: Phase A edges, publishedAt
+  invariants, illegal transitions (entire negative-space
+  matrix), Phase B states stuck-on-purpose, purity (no input
+  mutation), `allowedEvents`, `isPublic`.
+- `packages/domain/src/index.ts` — exports the new public API.
+  `allowedEvents` and `isPublic` are renamed at the export
+  site to `allowedArticleEvents` and `isArticlePublic` so they
+  don't collide with future subscription / paywall helpers.
+
+**Verifies**
+
+- `pnpm --filter @aito/domain test` → 49 pass (33 new + the
+  existing 16 from subscription + paywall)
+- `pnpm --filter @aito/web type-check` → clean (consumes the
+  new export through `transpilePackages`)
+- `pnpm --filter @aito/web build` → green
+- A `pnpm --filter @aito/domain type-check` failure pre-exists
+  this branch (`Cannot find type definition file for 'node'`
+  — the package's tsconfig lists `node` types but the package
+  doesn't depend on `@types/node`). Vitest has its own type
+  resolution so the tests pass; verified the failure isn't
+  caused by today's diff by stashing and re-running. Logged
+  as out-of-scope.
+
+**Decisions**
+
+- **6-state union matches the Prisma enum 1:1.** Phase A only
+  uses 3 of them (`draft`, `published`, `archived`) but listing
+  all 6 means there's no DB-to-domain mapping layer to maintain.
+  Phase B states have empty allowed-transitions maps — so if a
+  row ever lands in `in_review` / `legal_review` / `scheduled`
+  (manual DB edit, premature Phase B feature toggle), the
+  machine refuses to move it and surfaces a clear error rather
+  than silently doing something wrong.
+- **`publish` is idempotent on `publishedAt`.** First publish
+  stamps `publishedAt = now`. Re-publishing (after an
+  `unpublish → fix → publish` hot-fix cycle) preserves the
+  *original* publishedAt so SEO permalinks stay anchored. Same
+  decision Stripe makes about subscription start dates.
+- **`unarchive → draft`, not `unarchive → published`.** Pulling
+  an article out of the archive means re-opening it for edits;
+  the editor must hit publish a second time. Auto-publishing on
+  unarchive would surprise people who archive a stale piece
+  intending to revise it.
+- **`archive` allowed from both `draft` and `published`.** Cheap
+  way to clean up abandoned drafts ("this idea didn't pan out")
+  without losing the audit trail of an article that existed.
+- **`allowedEvents()` helper exists for the admin UI.** Day 8
+  needs to render Publish / Unpublish / Archive / Unarchive
+  buttons conditionally; rather than re-derive the legal set in
+  React, it asks the state machine. One source of truth.
+- **`IllegalArticleTransitionError` is distinct from
+  `IllegalTransitionError` (subscription).** Future code may
+  catch one but not the other (e.g. a webhook handler
+  swallowing subscription errors shouldn't swallow article
+  errors). Same class shape, different identity.
+- **No `requireDraft` / `requirePublished` helpers yet.** Day 3+
+  server actions check state via Prisma `where` clauses (e.g.
+  `where: { id, state: { in: ["draft", "in_review"] } }`)
+  which is more direct than wrapping the article and reading
+  `.state`. If we end up writing the same guard 3+ times we'll
+  hoist it into a helper.
+
+**Carry-over**
+
+- Day 3 starts with: `/admin/articles` list page (status tabs +
+  pagination + search) + a `createArticleAction` server action
+  + a `recordAuditLog()` helper modelled on `recordAuthEvent`.
+- Article state column on existing `Article` rows in the seed
+  doesn't get touched today. Seed already creates articles in
+  `published` state. Day 3's list page will be populated by
+  those + any new drafts the editor creates.
