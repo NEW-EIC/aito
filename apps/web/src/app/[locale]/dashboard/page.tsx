@@ -1,18 +1,22 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Card } from "@aito/ui";
 import { Badge, TierPill } from "@aito/ui";
-import { CreditCard } from "lucide-react";
+import { CreditCard, ArrowRight } from "lucide-react";
 import { Link } from "@/i18n/routing";
-import { prisma, SubscriptionState as DbSubscriptionState } from "@aito/database";
+import {
+  prisma,
+  ArticleStatus,
+  Locale as DbLocale,
+  SubscriptionState as DbSubscriptionState,
+} from "@aito/database";
 import { requireViewer } from "@/lib/auth/viewer";
 import { getSessionFromCookie } from "@/lib/auth/session";
 
-interface ReadRow {
-  date: string;
-  title: string;
-  show: string;
-  pct: number;
-}
+const UI_TO_DB: Record<string, DbLocale> = {
+  en: DbLocale.en,
+  "zh-CN": DbLocale.zh_CN,
+  "zh-HK": DbLocale.zh_HK,
+};
 
 export default async function DashboardPage({
   params,
@@ -24,7 +28,6 @@ export default async function DashboardPage({
   await requireViewer("/dashboard");
   const t = await getTranslations("dashboard");
   const tBilling = await getTranslations("checkout.billing");
-  const read = t.raw("read") as { title: string; sub: string; rows: ReadRow[] };
 
   // Pull the real user + their freshest subscription. Webhook handlers update
   // these rows; reading them server-side here means /dashboard is always in
@@ -33,11 +36,51 @@ export default async function DashboardPage({
   const userId = sess!.user.id;
   const user = sess!.user;
 
-  const subscription = await prisma.subscription.findFirst({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-    include: { plan: true },
-  });
+  const [subscription, latestArticles, publishedCount] = await Promise.all([
+    prisma.subscription.findFirst({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      include: { plan: true },
+    }),
+    prisma.article.findMany({
+      where: { status: ArticleStatus.published, deletedAt: null },
+      orderBy: { publishedAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        slug: true,
+        publishedAt: true,
+        translations: {
+          select: { locale: true, title: true },
+        },
+      },
+    }),
+    prisma.article.count({
+      where: { status: ArticleStatus.published, deletedAt: null },
+    }),
+  ]);
+
+  // Pick the viewer's locale's translation per article; fall back to first.
+  const desiredDbLocale = UI_TO_DB[locale];
+  const recentReads = latestArticles
+    .map((a) => {
+      const tr =
+        a.translations.find((tt) => tt.locale === desiredDbLocale) ??
+        a.translations[0];
+      if (!tr) return null;
+      return {
+        id: a.id,
+        slug: a.slug,
+        title: tr.title,
+        date: a.publishedAt
+          ? a.publishedAt.toLocaleDateString(locale, {
+              month: "short",
+              day: "numeric",
+            })
+          : "",
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
 
   const displayName =
     user.displayName?.trim() ||
@@ -54,6 +97,7 @@ export default async function DashboardPage({
 
   return (
     <main id="main" className="container mx-auto px-4 py-12 max-w-5xl">
+      {/* Reader header */}
       <div className="flex items-center gap-3">
         <div className="size-12 rounded-pill bg-fg-muted/15 grid place-items-center font-semibold text-fg">
           {initials}
@@ -68,7 +112,23 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      <div className="mt-10 grid gap-6 md:grid-cols-3">
+      {/* Primary CTA strip — "what readers want first": jump to articles. */}
+      <Link
+        href="/articles"
+        className="mt-8 group flex items-center justify-between gap-4 rounded-card border border-border bg-surface p-5 transition-colors hover:border-fg/40"
+      >
+        <div className="min-w-0">
+          <div className="text-xs uppercase tracking-wider text-fg-soft font-semibold">
+            {t("browse.title")}
+          </div>
+          <div className="mt-1 font-display text-xl font-semibold text-fg">
+            {t("browse.count", { count: publishedCount })}
+          </div>
+        </div>
+        <ArrowRight className="size-5 text-fg-muted shrink-0 transition-transform group-hover:translate-x-1" />
+      </Link>
+
+      <div className="mt-6 grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-1 p-6">
           <h2 className="text-xs uppercase tracking-wider text-fg-soft font-semibold">
             {tBilling("title")}
@@ -95,28 +155,34 @@ export default async function DashboardPage({
 
         <Card className="md:col-span-2 p-6">
           <h2 className="text-xs uppercase tracking-wider text-fg-soft font-semibold">
-            {read.title}
+            {t("recent.title")}
           </h2>
-          <p className="mt-1 text-sm text-fg-soft">{read.sub}</p>
-          <ul className="mt-4 divide-y divide-rule">
-            {read.rows.map((r, i) => (
-              <li
-                key={i}
-                className="py-3 grid grid-cols-[5rem_1fr_auto] gap-3 items-baseline"
-              >
-                <span className="font-mono text-xs text-fg-soft tabular-nums-feature">
-                  {r.date}
-                </span>
-                <div className="min-w-0">
-                  <div className="text-sm text-fg truncate">{r.title}</div>
-                  <div className="text-xs text-fg-soft">{r.show}</div>
-                </div>
-                <span className="text-xs font-mono text-fg-muted tabular-nums-feature shrink-0">
-                  {r.pct}%
-                </span>
-              </li>
-            ))}
-          </ul>
+          <p className="mt-1 text-sm text-fg-soft">{t("recent.sub")}</p>
+
+          {recentReads.length === 0 ? (
+            <p className="mt-4 text-sm text-fg-muted italic">
+              {t("recent.empty")}
+            </p>
+          ) : (
+            <ul className="mt-4 divide-y divide-rule">
+              {recentReads.map((r) => (
+                <li key={r.id}>
+                  <Link
+                    href={`/articles/${r.slug}`}
+                    className="py-3 grid grid-cols-[5rem_1fr_auto] gap-3 items-baseline hover:opacity-80 transition-opacity"
+                  >
+                    <span className="font-mono text-xs text-fg-soft tabular-nums-feature">
+                      {r.date}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-sm text-fg truncate">{r.title}</div>
+                    </div>
+                    <ArrowRight className="size-3.5 text-fg-soft shrink-0" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       </div>
     </main>

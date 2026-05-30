@@ -2,6 +2,7 @@
   "locale": "en",
   "nav": {
     "shows": "Shows",
+    "articles": "Articles",
     "pricing": "Pricing",
     "live": "Live",
     "community": "Community",
@@ -765,8 +766,17 @@
     "pagination": "Page 1 of 34 · 412 issues"
   },
   "dashboard": {
-    "greeting": "Good morning,",
-    "reader": "Selina K.",
+    "greeting": "Welcome back,",
+    "reader": "Reader",
+    "browse": {
+      "title": "Read the desk",
+      "count": "{count, plural, =0 {No articles yet} =1 {1 article published} other {# articles published}}"
+    },
+    "recent": {
+      "title": "Latest from the desk",
+      "sub": "Newest published pieces.",
+      "empty": "No published articles yet."
+    },
     "nav": [
       "Overview",
       "Reading",
@@ -1051,6 +1061,11 @@
     "articles": {
       "heading": "Articles",
       "subheading": "All drafts, published pieces, and archived work. Click a row to edit.",
+      "localeNames": {
+        "en": "English",
+        "zh-CN": "Simplified Chinese",
+        "zh-HK": "Traditional Chinese (Hong Kong)"
+      },
       "newArticle": "New article",
       "searchPlaceholder": "Search by title…",
       "untitled": "(untitled)",
@@ -1118,9 +1133,16 @@
           "unpublish": "Unpublish",
           "archive": "Archive",
           "unarchive": "Unarchive",
+          "confirmTitle": {
+            "publish": "Publish article?",
+            "unpublish": "Unpublish article?",
+            "archive": "Archive article?"
+          },
           "confirmPublish": "Publish this article now? It becomes visible to readers at the matching plan tier.",
           "confirmUnpublish": "Pull this article from public view? You can republish at any time.",
           "confirmArchivePublished": "Archive this published article? Readers will no longer see it.",
+          "confirmYes": "Confirm",
+          "confirmNo": "Cancel",
           "errors": {
             "illegal": "That transition isn't allowed from the current status.",
             "missingTranslation": "Add at least one translation before publishing."
@@ -1210,7 +1232,10 @@
           "copyFromLocale": {
             "trigger": "Copy from…",
             "heading": "Source language",
-            "overwriteConfirm": "Replace the current draft with the source language's text? Your unsaved changes will be lost."
+            "overwriteTitle": "Replace current draft?",
+            "overwriteConfirm": "Replace the current draft with the source language's text? Your unsaved changes will be lost.",
+            "confirmYes": "Replace",
+            "confirmNo": "Cancel"
           },
           "htmlSource": {
             "open": "View HTML",

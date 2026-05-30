@@ -2,6 +2,7 @@
   "locale": "zh-CN",
   "nav": {
     "shows": "栏目",
+    "articles": "文章",
     "pricing": "订阅方案",
     "live": "直播课",
     "community": "社群",
@@ -765,8 +766,17 @@
     "pagination": "第 1 页 / 共 34 页 · 412 期"
   },
   "dashboard": {
-    "greeting": "早上好,",
-    "reader": "Selina K.",
+    "greeting": "欢迎回来,",
+    "reader": "读者",
+    "browse": {
+      "title": "浏览编辑部",
+      "count": "{count, plural, =0 {还没有文章} other {已发布 # 篇文章}}"
+    },
+    "recent": {
+      "title": "编辑部最新",
+      "sub": "最近发布的稿件。",
+      "empty": "暂无已发布的文章。"
+    },
     "nav": [
       "总览",
       "阅读",
@@ -1051,6 +1061,11 @@
     "articles": {
       "heading": "文章",
       "subheading": "所有草稿、已发布与归档的稿件。点击条目进入编辑。",
+      "localeNames": {
+        "en": "英文",
+        "zh-CN": "简体中文",
+        "zh-HK": "繁体中文(香港)"
+      },
       "newArticle": "新建文章",
       "searchPlaceholder": "按标题搜索…",
       "untitled": "(无标题)",
@@ -1118,9 +1133,16 @@
           "unpublish": "取消发布",
           "archive": "归档",
           "unarchive": "取消归档",
+          "confirmTitle": {
+            "publish": "确认发布?",
+            "unpublish": "确认取消发布?",
+            "archive": "确认归档?"
+          },
           "confirmPublish": "立即发布?读者将按所属档位看到全文。",
           "confirmUnpublish": "把这篇文章从公众视图中下线?之后可随时重新发布。",
           "confirmArchivePublished": "归档已发布的文章?读者将看不到。",
+          "confirmYes": "确认",
+          "confirmNo": "取消",
           "errors": {
             "illegal": "当前状态不允许该操作。",
             "missingTranslation": "发布前请至少添加一种语言的翻译。"
@@ -1210,7 +1232,10 @@
           "copyFromLocale": {
             "trigger": "从其他语言复制…",
             "heading": "源语言",
-            "overwriteConfirm": "确定用所选语言的文本替换当前草稿吗?未保存的更改会丢失。"
+            "overwriteTitle": "覆盖当前草稿?",
+            "overwriteConfirm": "确定用所选语言的文本替换当前草稿吗?未保存的更改会丢失。",
+            "confirmYes": "替换",
+            "confirmNo": "取消"
           },
           "htmlSource": {
             "open": "查看 HTML",

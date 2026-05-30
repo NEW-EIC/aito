@@ -77,6 +77,7 @@ export default async function EditArticlePage({
   const tTabs = await getTranslations("admin.articles.edit.translations");
   const tToolbar = await getTranslations("admin.articles.edit.toolbar");
   const tActions = await getTranslations("admin.articles.edit.actions");
+  const tArticles = await getTranslations("admin.articles");
 
   // Translate DB locales → UI locale strings the form components speak.
   const existingTranslations = article.translations
@@ -145,9 +146,16 @@ export default async function EditArticlePage({
             unpublish: tActions("unpublish"),
             archive: tActions("archive"),
             unarchive: tActions("unarchive"),
+            confirmTitle: {
+              publish: tActions("confirmTitle.publish"),
+              unpublish: tActions("confirmTitle.unpublish"),
+              archive: tActions("confirmTitle.archive"),
+            },
             confirmPublish: tActions("confirmPublish"),
             confirmUnpublish: tActions("confirmUnpublish"),
             confirmArchivePublished: tActions("confirmArchivePublished"),
+            confirmYes: tActions("confirmYes"),
+            confirmNo: tActions("confirmNo"),
             errors: {
               illegal: tActions("errors.illegal"),
               missingTranslation: tActions("errors.missingTranslation"),
@@ -247,6 +255,11 @@ export default async function EditArticlePage({
             uiLocales={UI_LOCALES}
             labels={{
               addTranslation: tTabs("addTranslation"),
+              localeNames: {
+                en: tArticles("localeNames.en"),
+                "zh-CN": tArticles("localeNames.zh-CN"),
+                "zh-HK": tArticles("localeNames.zh-HK"),
+              },
               picker: {
                 heading: tTabs("picker.heading"),
                 cancel: tTabs("picker.cancel"),
@@ -304,7 +317,10 @@ export default async function EditArticlePage({
               copyFromLocale: {
                 trigger: tTabs("copyFromLocale.trigger"),
                 heading: tTabs("copyFromLocale.heading"),
+                overwriteTitle: tTabs("copyFromLocale.overwriteTitle"),
                 overwriteConfirm: tTabs("copyFromLocale.overwriteConfirm"),
+                confirmYes: tTabs("copyFromLocale.confirmYes"),
+                confirmNo: tTabs("copyFromLocale.confirmNo"),
               },
               htmlSource: {
                 open: tTabs("htmlSource.open"),

@@ -15,6 +15,8 @@ interface Labels {
   kindOptions: { newsletter: string; podcast: string; blog: string };
   locale: string;
   localeHelp: string;
+  /** Friendly display name per locale code (e.g. "en" → "English"). */
+  localeNames: Record<"en" | "zh-CN" | "zh-HK", string>;
   title: string;
   titleHelp: string;
   slug: string;
@@ -150,7 +152,7 @@ export function NewArticleForm({ labels }: { labels: Labels }) {
         >
           {LOCALES.map((loc) => (
             <option key={loc} value={loc}>
-              {loc}
+              {labels.localeNames[loc]}
             </option>
           ))}
         </select>

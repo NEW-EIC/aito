@@ -20,15 +20,19 @@ import {
   type ArticleEvent,
   type ArticleState,
 } from "@aito/domain";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 export interface ArticleStatusActionsLabels {
   publish: string;
   unpublish: string;
   archive: string;
   unarchive: string;
+  confirmTitle: { publish: string; unpublish: string; archive: string };
   confirmPublish: string;
   confirmUnpublish: string;
   confirmArchivePublished: string;
+  confirmYes: string;
+  confirmNo: string;
   errors: {
     illegal: string;
     missingTranslation: string;
@@ -111,6 +115,11 @@ export function ArticleStatusActions({
   const [busyEvent, setBusyEvent] = useState<ArticleEvent["type"] | null>(null);
   const [, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // When a transition needs confirming, we stash the requested event
+  // here and show the ConfirmDialog. Cleared on confirm/cancel.
+  const [pendingEvent, setPendingEvent] = useState<ArticleEvent["type"] | null>(
+    null,
+  );
 
   // Pull the legal events from the state machine — single source of truth
   // for what buttons to render.
@@ -127,22 +136,28 @@ export function ArticleStatusActions({
     );
   }
 
-  async function run(event: ArticleEvent["type"]) {
-    const meta = EVENT_META[event];
-    if (meta.confirmKey) {
-      // - publish: always confirm (going live is the most consequential
-      //   transition; reader-visible)
-      // - unpublish: always confirm (pulls live content)
-      // - archive: only confirm when archiving a *published* row;
-      //   archiving a draft is harmless and shouldn't nag
-      const needsConfirm =
-        event === "publish" ||
-        event === "unpublish" ||
-        (event === "archive" && status === "published");
-      if (needsConfirm && !window.confirm(labels[meta.confirmKey])) {
-        return;
-      }
+  function eventNeedsConfirm(event: ArticleEvent["type"]): boolean {
+    // - publish: always (going live is the most consequential transition)
+    // - unpublish: always (pulls live content)
+    // - archive: only when archiving a *published* row; archiving a
+    //   draft is harmless and shouldn't nag
+    return (
+      event === "publish" ||
+      event === "unpublish" ||
+      (event === "archive" && status === "published")
+    );
+  }
+
+  function request(event: ArticleEvent["type"]) {
+    if (eventNeedsConfirm(event)) {
+      setPendingEvent(event);
+      return;
     }
+    void execute(event);
+  }
+
+  async function execute(event: ArticleEvent["type"]) {
+    setPendingEvent(null);
     setBusyEvent(event);
     setError(null);
     const payload: TransitionInput = { articleId, event };
@@ -198,7 +213,7 @@ export function ArticleStatusActions({
             <button
               key={event}
               type="button"
-              onClick={() => run(event)}
+              onClick={() => request(event)}
               disabled={busyEvent !== null}
               className={[
                 "inline-flex h-9 items-center gap-2 rounded-pill px-4 text-sm font-medium transition-colors",
@@ -225,6 +240,23 @@ export function ArticleStatusActions({
           {error}
         </p>
       )}
+      <ConfirmDialog
+        open={pendingEvent !== null}
+        title={pendingEvent ? labels.confirmTitle[pendingEvent as "publish" | "unpublish" | "archive"] : ""}
+        description={
+          pendingEvent === "publish"
+            ? labels.confirmPublish
+            : pendingEvent === "unpublish"
+              ? labels.confirmUnpublish
+              : pendingEvent === "archive"
+                ? labels.confirmArchivePublished
+                : ""
+        }
+        tone={pendingEvent === "publish" ? "primary" : "danger"}
+        labels={{ confirm: labels.confirmYes, cancel: labels.confirmNo }}
+        onConfirm={() => pendingEvent && execute(pendingEvent)}
+        onCancel={() => setPendingEvent(null)}
+      />
     </div>
   );
 }

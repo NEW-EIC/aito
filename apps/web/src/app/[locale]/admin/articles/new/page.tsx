@@ -28,6 +28,7 @@ export default async function NewArticlePage({
   }
 
   const t = await getTranslations("admin.articles.new");
+  const tLocales = await getTranslations("admin.articles.localeNames");
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -53,6 +54,11 @@ export default async function NewArticlePage({
             },
             locale: t("locale"),
             localeHelp: t("localeHelp"),
+            localeNames: {
+              en: tLocales("en"),
+              "zh-CN": tLocales("zh-CN"),
+              "zh-HK": tLocales("zh-HK"),
+            },
             title: t("title"),
             titleHelp: t("titleHelp"),
             slug: t("slug"),

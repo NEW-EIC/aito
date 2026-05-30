@@ -12,6 +12,7 @@ import { useEffect, useRef } from "react";
 import { Toolbar } from "./Toolbar";
 import { sanitizeHtml } from "@/lib/admin/sanitize";
 import { uploadImageFile } from "./uploadImage";
+import { useToasts, ToastView } from "../Toast";
 
 interface Props {
   /** Initial HTML to load. Subsequent updates to this prop reset the editor
@@ -46,6 +47,10 @@ export function Editor({
   // before `useEditor` returns, but their closures fire async on user
   // interaction, by which time the ref has been populated.
   const editorRef = useRef<TiptapEditor | null>(null);
+
+  // Local toast stack — image-upload failures surface here instead of
+  // a blocking window.alert(). Scoped to this Editor instance.
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
 
   // Insert an image at a position. Optimistically inserts a placeholder
   // (a known data URL via the Image extension's allowBase64 path) so
@@ -97,20 +102,17 @@ export function Editor({
     if (targetPos === null) return; // node was deleted during upload
 
     if (!result.ok) {
-      // Remove the placeholder + flag the failure. Phase B will hook a
-      // proper toast component in; for now the inline alert + console
-      // log are enough for editors to know something went wrong.
+      // Remove the placeholder and surface the failure as a toast so
+      // editors see exactly what went wrong without losing focus on
+      // the editor.
       ed.chain()
         .focus()
         .deleteRange({ from: targetPos, to: targetPos + 1 })
         .run();
-      const msg = `Image upload failed (${result.code}): ${result.message ?? ""}`;
-      console.error("[editor]", msg);
-      // Use alert sparingly — but silently dropping the placeholder
-      // would leave editors wondering why drag-drop "did nothing".
-      if (typeof window !== "undefined") {
-        window.setTimeout(() => window.alert(msg), 0);
-      }
+      const title = "Image upload failed";
+      const description = `${result.code}${result.message ? `: ${result.message}` : ""}`;
+      console.error("[editor]", title, description);
+      pushToast("error", title, description);
       return;
     }
 
@@ -274,14 +276,17 @@ export function Editor({
   }, [editor, initialHTML]);
 
   return (
-    <div className="rounded-md border border-border bg-surface focus-within:border-fg/40">
-      <Toolbar
-        editor={editor}
-        labels={toolbarLabels}
-        onUploadImage={(file) => insertImageAtPosition(file, null)}
-      />
-      <EditorContent editor={editor} />
-    </div>
+    <>
+      <div className="rounded-md border border-border bg-surface focus-within:border-fg/40">
+        <Toolbar
+          editor={editor}
+          labels={toolbarLabels}
+          onUploadImage={(file) => insertImageAtPosition(file, null)}
+        />
+        <EditorContent editor={editor} />
+      </div>
+      <ToastView toasts={toasts} dismiss={dismissToast} />
+    </>
   );
 }
 

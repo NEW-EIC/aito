@@ -2,6 +2,7 @@
   "locale": "zh-HK",
   "nav": {
     "shows": "欄目",
+    "articles": "文章",
     "pricing": "訂閱方案",
     "live": "直播課",
     "community": "社群",
@@ -765,8 +766,17 @@
     "pagination": "第 1 頁 / 共 34 頁 · 412 期"
   },
   "dashboard": {
-    "greeting": "早安,",
-    "reader": "Selina K.",
+    "greeting": "歡迎返嚟,",
+    "reader": "讀者",
+    "browse": {
+      "title": "瀏覽編輯部",
+      "count": "{count, plural, =0 {仲未有文章} other {已發佈 # 篇文章}}"
+    },
+    "recent": {
+      "title": "編輯部最新",
+      "sub": "最近發佈嘅稿件。",
+      "empty": "暫無已發佈嘅文章。"
+    },
     "nav": [
       "總覽",
       "閱讀",
@@ -1051,6 +1061,11 @@
     "articles": {
       "heading": "文章",
       "subheading": "所有草稿、已發佈同已歸檔嘅稿件。撳條目入去編輯。",
+      "localeNames": {
+        "en": "英文",
+        "zh-CN": "簡體中文",
+        "zh-HK": "繁體中文(香港)"
+      },
       "newArticle": "新建文章",
       "searchPlaceholder": "按標題搜尋…",
       "untitled": "(無標題)",
@@ -1118,9 +1133,16 @@
           "unpublish": "取消發佈",
           "archive": "歸檔",
           "unarchive": "解除歸檔",
+          "confirmTitle": {
+            "publish": "確認發佈?",
+            "unpublish": "確認取消發佈?",
+            "archive": "確認歸檔?"
+          },
           "confirmPublish": "即刻發佈?讀者會按所屬檔位睇到全文。",
           "confirmUnpublish": "將呢篇文章由公眾視圖下線?之後隨時可以重新發佈。",
           "confirmArchivePublished": "歸檔呢篇已發佈嘅文章?讀者將會見唔到。",
+          "confirmYes": "確認",
+          "confirmNo": "取消",
           "errors": {
             "illegal": "目前狀態唔允許呢個操作。",
             "missingTranslation": "發佈前請最少加一種語言嘅翻譯。"
@@ -1210,7 +1232,10 @@
           "copyFromLocale": {
             "trigger": "由其他語言複製…",
             "heading": "來源語言",
-            "overwriteConfirm": "確定用所選語言嘅文本取代當前草稿?未保存嘅修改會冇咗。"
+            "overwriteTitle": "覆寫目前草稿?",
+            "overwriteConfirm": "確定用所選語言嘅文本取代當前草稿?未保存嘅修改會冇咗。",
+            "confirmYes": "覆寫",
+            "confirmNo": "取消"
           },
           "htmlSource": {
             "open": "查看 HTML",

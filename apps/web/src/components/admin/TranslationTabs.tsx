@@ -13,6 +13,7 @@ import { SaveIndicator } from "./SaveIndicator";
 import { Editor } from "./editor/Editor";
 import type { ToolbarLabels } from "./editor/Toolbar";
 import { countWords } from "@/lib/admin/wordCount";
+import { ConfirmDialog } from "./ConfirmDialog";
 
 export interface ExistingTranslation {
   locale: string;
@@ -28,6 +29,8 @@ export interface ExistingTranslation {
 
 interface Labels {
   addTranslation: string;
+  /** Friendly display name per locale code (e.g. "en" → "English"). */
+  localeNames: Record<string, string>;
   picker: {
     heading: string;
     cancel: string;
@@ -52,7 +55,10 @@ interface Labels {
   copyFromLocale: {
     trigger: string;
     heading: string;
+    overwriteTitle: string;
     overwriteConfirm: string;
+    confirmYes: string;
+    confirmNo: string;
   };
   htmlSource: {
     open: string;
@@ -171,7 +177,7 @@ export function TranslationTabs({
                   : "border-transparent text-fg-muted hover:border-fg/30 hover:text-fg",
               ].join(" ")}
             >
-              {tr.locale}
+              {labels.localeNames[tr.locale] ?? tr.locale}
             </button>
           );
         })}
@@ -199,6 +205,7 @@ export function TranslationTabs({
             submit: labels.picker.submit,
             submitting: labels.picker.submitting,
             allLocalesPresent: labels.picker.allLocalesPresent,
+            localeNames: labels.localeNames,
             errors: labels.errors,
           }}
         />
@@ -242,6 +249,7 @@ function AddTranslationPicker({
     submit: string;
     submitting: string;
     allLocalesPresent: string;
+    localeNames: Record<string, string>;
     errors: Labels["errors"];
   };
 }) {
@@ -295,7 +303,7 @@ function AddTranslationPicker({
         >
           {missingLocales.map((l) => (
             <option key={l} value={l}>
-              {l}
+              {labels.localeNames[l] ?? l}
             </option>
           ))}
         </select>
@@ -404,14 +412,27 @@ function TranslationEditor({
    *  editor to translate, not committing a fresh row. SEO fields copy
    *  too because if the editor is rewriting them anyway, having the
    *  source nearby is helpful. */
-  function copyFromTranslation(source: ExistingTranslation, confirmFn: () => boolean) {
-    if (dirty && !confirmFn()) return;
+  // When the editor picks a source locale, we either copy immediately
+  // (clean draft, no risk of data loss) or open the ConfirmDialog
+  // because there are unsaved changes the copy would overwrite.
+  const [pendingCopySource, setPendingCopySource] =
+    useState<ExistingTranslation | null>(null);
+
+  function applyCopy(source: ExistingTranslation) {
     setTitle(source.title);
     setSubtitle(source.subtitle);
     setExcerpt(source.excerpt);
     setBody(source.body);
     setSeoTitle(source.seoTitle);
     setSeoDescription(source.seoDescription);
+  }
+
+  function requestCopyFromTranslation(source: ExistingTranslation) {
+    if (!dirty) {
+      applyCopy(source);
+      return;
+    }
+    setPendingCopySource(source);
   }
 
   // The shared save routine, used by both the explicit submit button and
@@ -540,15 +561,12 @@ function TranslationEditor({
           {otherTranslations.length > 0 && (
             <CopyFromLocaleMenu
               sources={otherTranslations}
-              onCopy={(src) =>
-                copyFromTranslation(src, () =>
-                  window.confirm(labels.copyFromLocale.overwriteConfirm),
-                )
-              }
+              onCopy={requestCopyFromTranslation}
               labels={{
                 trigger: labels.copyFromLocale.trigger,
                 heading: labels.copyFromLocale.heading,
               }}
+              localeNames={labels.localeNames}
             />
           )}
           <SaveIndicator
@@ -711,6 +729,22 @@ function TranslationEditor({
           {busy ? labels.saving : labels.save}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={pendingCopySource !== null}
+        title={labels.copyFromLocale.overwriteTitle}
+        description={labels.copyFromLocale.overwriteConfirm}
+        tone="danger"
+        labels={{
+          confirm: labels.copyFromLocale.confirmYes,
+          cancel: labels.copyFromLocale.confirmNo,
+        }}
+        onConfirm={() => {
+          if (pendingCopySource) applyCopy(pendingCopySource);
+          setPendingCopySource(null);
+        }}
+        onCancel={() => setPendingCopySource(null)}
+      />
     </form>
   );
 }
@@ -721,10 +755,12 @@ function CopyFromLocaleMenu({
   sources,
   onCopy,
   labels,
+  localeNames,
 }: {
   sources: ExistingTranslation[];
   onCopy: (source: ExistingTranslation) => void;
   labels: { trigger: string; heading: string };
+  localeNames: Record<string, string>;
 }) {
   return (
     <details className="relative">
@@ -746,7 +782,9 @@ function CopyFromLocaleMenu({
                 }}
                 className="block w-full rounded px-2 py-1.5 text-left text-sm text-fg hover:bg-bg-alt"
               >
-                <span className="font-mono text-xs text-fg-soft">{s.locale}</span>{" "}
+                <span className="text-xs text-fg-soft">
+                  {localeNames[s.locale] ?? s.locale}
+                </span>{" "}
                 <span className="truncate">{s.title || "(untitled)"}</span>
               </button>
             </li>
