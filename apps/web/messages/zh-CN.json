@@ -1005,5 +1005,39 @@
     "bridgeTitle": "为什么做一座太平洋上的桥。",
     "bridge": "我们认为下一个十年的投资需要用两种语言读两个市场,且用同一套标准。美股有可信的英语财经媒体;大中华有可信的中文财经媒体;但目前没有一支编辑部由同一拨人,用同一套标准,为认真的读者两边都写。我们要做那一支。",
     "contact": "媒体、招聘与合作:hello@aito.io"
+  },
+  "admin": {
+    "appName": "AITO",
+    "backToSite": "返回站点",
+    "signedInAs": "当前登录",
+    "comingSoon": "敬请期待",
+    "backToDashboard": "返回控制台",
+    "nav": {
+      "dashboard": "控制台",
+      "articles": "文章",
+      "reviews": "审核",
+      "users": "用户",
+      "settings": "设置"
+    },
+    "dashboard": {
+      "heading": "编辑部后台",
+      "subheading": "创建文章、管理翻译、发布。使用左侧导航或下方入口。"
+    },
+    "tiles": {
+      "articles": "文章",
+      "articlesDesc": "查看草稿与已发布稿件,创建新文章。",
+      "reviews": "审核队列",
+      "reviewsDesc": "等待编辑审核的文章。通过或返回修改意见。",
+      "users": "用户",
+      "usersDesc": "查询读者与编辑,查看订阅状态。",
+      "settings": "设置",
+      "settingsDesc": "平台级开关。合规、试用期、功能标志。"
+    },
+    "placeholders": {
+      "articles": "文章列表将在 Phase A 第 3 天上线。目前可使用即将上线的新建表单开始草稿。",
+      "reviews": "编辑审核流程在 Phase B 实现。现阶段编辑直接从草稿点击发布。",
+      "users": "用户只读视图在 Phase B 实现。现阶段以 Prisma Studio 为准。",
+      "settings": "设置界面在 Phase B 实现。现阶段在 Prisma Studio 修改 PlatformSetting 行。"
+    }
   }
 }

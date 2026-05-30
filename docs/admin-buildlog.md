@@ -338,3 +338,144 @@ Format each day:
 
 - Day 1 starts with: `lib/auth/staff.ts` + `/admin` shell +
   dashboard tile + seed `demo-admin@aito.io`.
+
+---
+
+### Day 1 — 2026-05-29 — Staff auth + admin shell + tile dashboard
+
+Closes: "Who can see /admin?"
+
+**Shipped**
+
+New files:
+
+- `apps/web/src/lib/auth/staff.ts` — `getStaffContext()` /
+  `requireStaff()` / `requirePermission()` / `hasPermission()`
+  helpers mirroring the shape of `viewer.ts`. All four go through
+  one `cache()`-wrapped `prisma.userRole.findMany()` per request,
+  so a layout + page + server action only pay one query. Excludes
+  revoked and expired grants in the SQL where clause; throws a
+  typed `StaffAuthError` (rather than redirecting) inside
+  `requirePermission` so server actions can return a clean error.
+- `apps/web/src/lib/auth/__tests__/staff.test.ts` — 12 unit tests
+  covering anonymous, signed-in-but-no-roles, multi-role permission
+  dedup, expired-grant exclusion, and all redirect paths in
+  `requireStaff` plus the two error codes thrown by
+  `requirePermission`.
+- `apps/web/src/components/admin/AdminNav.tsx` — left nav with
+  five items (dashboard / articles / reviews / users / settings).
+  Disabled items render as `<span>` not `<Link>` (no clickable
+  link to a placeholder) and carry a "Soon" tag.
+- `apps/web/src/components/admin/AdminShell.tsx` — sidebar +
+  top-bar layout. Sidebar shows the AdminNav plus a footer card
+  with signed-in email + role chips. Mobile gets a slim topbar
+  (full nav drawer is Phase B).
+- `apps/web/src/app/[locale]/admin/layout.tsx` — server component
+  that calls `requireStaff()` (which redirects on its own), pulls
+  `admin.*` translations, computes the current path from
+  request headers, and renders `AdminShell`. Marked
+  `dynamic = "force-dynamic"` so each request goes through the
+  guard.
+- `apps/web/src/app/[locale]/admin/page.tsx` — dashboard with
+  four tiles. Articles is a real `<Link>`; the other three render
+  as disabled cards.
+- `apps/web/src/app/[locale]/admin/articles/page.tsx` — placeholder
+  so the AdminNav link doesn't 404 before Day 3. Renders a copy
+  pointing forward to the upcoming create form.
+- `apps/web/src/app/[locale]/admin/reviews/page.tsx`,
+  `users/page.tsx`, `settings/page.tsx` — three "coming in Phase B"
+  placeholder pages so direct URL hits don't 404 either.
+
+Updates:
+
+- `apps/web/messages/{en,zh-CN,zh-HK}.json` — new top-level
+  `admin` namespace covering nav labels, dashboard heading,
+  tile titles + descriptions, and placeholder copy. zh-CN and
+  zh-HK are real translations done by hand on Day 1 because
+  they're short (the editor wants HK Cantonese leaning over
+  Taiwan zh-TW; verified separately).
+- `packages/database/prisma/seed.ts` — appended a `demo-admin@aito.io`
+  block: creates the user with `displayName = "Demo Admin"`,
+  argon2id-hashed password `DemoAdmin2026!`, marks email verified,
+  and grants the seeded `super_admin` role (global scope). Idempotent:
+  re-running seed doesn't pile up duplicate grants because we
+  pre-check on `(userId, roleId, scopeType: null, scopeId: null,
+  revokedAt: null)`.
+
+**Verifies**
+
+- `pnpm --filter @aito/web type-check` → clean
+- `pnpm --filter @aito/database type-check` → clean
+- `pnpm --filter @aito/web test` → 63 passing (12 new staff tests
+  added)
+- `pnpm --filter @aito/web build` → builds 5 new admin route
+  variants (`/admin`, `/admin/articles`, `/admin/reviews`,
+  `/admin/users`, `/admin/settings`) × 3 locales = 15 page
+  bundles. The expected build-time Prisma errors (DB unreachable
+  in CI) match what we saw on the stripe branch.
+
+Manual smoke (against local docker DB):
+
+1. `pnpm db:reset` then `pnpm db:seed` to refresh demo-admin
+2. Visit `/en/admin` while signed out → redirected to
+   `/sign-in?redirectTo=/admin`
+3. Sign in as `demo-free@aito.io` → visit `/en/admin` →
+   redirected to `/en/dashboard`
+4. Sign in as `demo-admin@aito.io` (`DemoAdmin2026!`) →
+   `/en/admin` renders the dashboard with all four tiles, the
+   sidebar shows "super admin" role chip
+5. Click "Articles" tile → lands on the Day 1 placeholder
+6. Direct URL `/en/admin/reviews` → placeholder, no 404
+
+**Decisions**
+
+- **No StaffProfile check.** The spec says staff are
+  `User + StaffProfile` rows. Phase A does NOT enforce a
+  StaffProfile row — `requireStaff()` is purely a UserRole-grants
+  check. Reason: in Phase A we don't surface the department / HR
+  metadata, so demanding a StaffProfile row would make the
+  super_admin seed grant unusable on its own. Phase B will add a
+  StaffProfile UI and tighten the guard.
+- **`requirePermission()` throws, doesn't redirect.** Inside a
+  server action, redirecting mid-call drops form state on the
+  floor. Throwing a typed `StaffAuthError` lets the action return
+  `{ ok: false, code: "permission_denied" }` to the client, which
+  can show a toast and leave the form intact. The page-level
+  `requireStaff()` does still redirect because there's nothing to
+  preserve at first paint.
+- **`x-invoke-path` for the current path.** Next 15 doesn't expose
+  a stable "current pathname" API to server components. The
+  middleware-injected `x-invoke-path` header is what next-intl
+  itself uses; falling back to `x-pathname` / `next-url` covers
+  the rare runtime where Next renames it. Worst case the
+  AdminNav highlights the wrong item — purely cosmetic.
+- **Placeholder pages for disabled tiles.** Renders nothing
+  destructive; preserves muscle memory for the user when typing
+  /admin/users directly; cheap to delete in Phase B when we
+  swap in the real pages. Alternative was returning 404s, which
+  reads as "this is broken" rather than "this is on its way".
+- **zh-CN / zh-HK translated on Day 1, not Day 9.** Original
+  plan was to leave them as EN placeholders until Day 9 batch
+  pass. Reversed because the strings are ~20 short labels and
+  doing them by hand now is ~10 minutes vs. a context-switch
+  cost on Day 9. zh-HK uses HK Cantonese-leaning Traditional
+  per CLAUDE.md.
+- **Demo admin password is `DemoAdmin2026!`.** Same shape as the
+  other demo accounts. Documented in seed.ts and below.
+
+**Carry-over**
+
+- Day 2 starts with: `packages/domain/src/article.ts` state machine
+  (`draft → published → archived` only for Phase A; in_review /
+  legal_review / scheduled stay reserved in the machine for Phase B
+  but aren't surfaced) + unit tests in
+  `packages/domain/src/__tests__/article.test.ts`.
+
+**Demo accounts cheat sheet (local DB after seed)**
+
+| Email                  | Password         | Use                          |
+| ---------------------- | ---------------- | ---------------------------- |
+| `demo-free@aito.io`    | `DemoFree2026!`  | Free reader (no subscription)|
+| `demo-premium@aito.io` | `DemoPremium2026!` | Premium reader              |
+| `demo-pro@aito.io`     | `DemoPro2026!`   | Pro reader                   |
+| `demo-admin@aito.io`   | `DemoAdmin2026!` | Editorial admin (super_admin) |

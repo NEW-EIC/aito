@@ -536,6 +536,62 @@ async function main() {
     }
   }
 
+  console.log("→ seeding demo admin user (super_admin role)");
+  {
+    const email = "demo-admin@aito.io";
+    const password = "DemoAdmin2026!";
+    const passwordHash = await argon2Hash(password, argonOpts);
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: {
+        emailVerifiedAt: new Date(),
+        authProvider: AuthProvider.internal,
+      },
+      create: {
+        email,
+        displayName: "Demo Admin",
+        emailVerifiedAt: new Date(),
+        authProvider: AuthProvider.internal,
+      },
+    });
+    await prisma.userCredential.upsert({
+      where: { userId: user.id },
+      update: {
+        passwordHash,
+        failedAttempts: 0,
+        lockedUntil: null,
+        lastVerifiedAt: new Date(),
+        mustChange: false,
+      },
+      create: { userId: user.id, passwordHash },
+    });
+    const superAdminRole = await prisma.role.findUniqueOrThrow({
+      where: { key: "super_admin" },
+    });
+    // Idempotent: only grant when there's no active grant. The unique index
+    // is (userId, roleId, scopeType, scopeId) — scope_type/scope_id null for
+    // a global grant — so we have to look it up rather than upsert on a
+    // single column.
+    const existingGrant = await prisma.userRole.findFirst({
+      where: {
+        userId: user.id,
+        roleId: superAdminRole.id,
+        scopeType: null,
+        scopeId: null,
+        revokedAt: null,
+      },
+    });
+    if (!existingGrant) {
+      await prisma.userRole.create({
+        data: {
+          userId: user.id,
+          roleId: superAdminRole.id,
+          grantedById: user.id, // self-granted in seed
+        },
+      });
+    }
+  }
+
   console.log(`✓ seed complete. macro article: ${yieldArticle.slug}`);
 }
 

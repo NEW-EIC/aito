@@ -1005,5 +1005,39 @@
     "bridgeTitle": "Why a Pacific bridge.",
     "bridge": "We think the next decade of investing requires reading two markets in two languages, with the same standards. There is a credible English-language press for US markets. There is a credible Mandarin-language press for Greater China. There is no editorial house yet writing both, by the same editors, for serious readers. We're building that.",
     "contact": "Press, hiring, and partnerships: hello@aito.io"
+  },
+  "admin": {
+    "appName": "AITO",
+    "backToSite": "Back to site",
+    "signedInAs": "Signed in as",
+    "comingSoon": "Soon",
+    "backToDashboard": "Back to dashboard",
+    "nav": {
+      "dashboard": "Dashboard",
+      "articles": "Articles",
+      "reviews": "Reviews",
+      "users": "Users",
+      "settings": "Settings"
+    },
+    "dashboard": {
+      "heading": "Editorial admin",
+      "subheading": "Create articles, manage translations, publish. Use the left nav or the tiles below."
+    },
+    "tiles": {
+      "articles": "Articles",
+      "articlesDesc": "Browse drafts and published pieces. Create a new article.",
+      "reviews": "Reviews queue",
+      "reviewsDesc": "Articles waiting on editorial review. Approve or send back with notes.",
+      "users": "Users",
+      "usersDesc": "Look up readers and editors. Inspect subscription state.",
+      "settings": "Settings",
+      "settingsDesc": "Platform-wide toggles. Compliance, trial length, feature flags."
+    },
+    "placeholders": {
+      "articles": "Article list arrives on Day 3 of Phase A. For now use the upcoming create form to start a draft.",
+      "reviews": "Editorial review workflow is Phase B. For now editors hit Publish directly from a draft.",
+      "users": "Read-only user explorer is Phase B. For now Prisma Studio is the source of truth.",
+      "settings": "Settings UI is Phase B. For now PlatformSetting rows are edited via Prisma Studio."
+    }
   }
 }

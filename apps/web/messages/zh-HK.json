@@ -1005,5 +1005,39 @@
     "bridgeTitle": "為甚麼做一座太平洋上的橋。",
     "bridge": "我們認為下一個十年的投資需要用兩種語言讀兩個市場,且用同一套標準。美股有可信的英語財經媒體;大中華有可信的中文財經媒體;但目前還沒有一支編輯部由同一批人,用同一套標準,為認真的讀者兩邊都寫。我們要做那一支。",
     "contact": "傳媒、招聘與合作:hello@aito.io"
+  },
+  "admin": {
+    "appName": "AITO",
+    "backToSite": "返回站台",
+    "signedInAs": "目前登入",
+    "comingSoon": "稍後上線",
+    "backToDashboard": "返回控制台",
+    "nav": {
+      "dashboard": "控制台",
+      "articles": "文章",
+      "reviews": "審核",
+      "users": "用戶",
+      "settings": "設定"
+    },
+    "dashboard": {
+      "heading": "編輯部後台",
+      "subheading": "建立文章、管理翻譯、發佈。使用左側導覽或下方入口。"
+    },
+    "tiles": {
+      "articles": "文章",
+      "articlesDesc": "查看草稿同已發佈嘅稿件,建立新文章。",
+      "reviews": "審核佇列",
+      "reviewsDesc": "等緊編輯審核嘅文章。通過或退回意見。",
+      "users": "用戶",
+      "usersDesc": "查詢讀者同編輯,查看訂閱狀態。",
+      "settings": "設定",
+      "settingsDesc": "平台級開關。合規、試用期、功能旗標。"
+    },
+    "placeholders": {
+      "articles": "文章清單會喺 Phase A 第 3 日上線。目前可用即將上線嘅新建表單開始草稿。",
+      "reviews": "編輯審核流程喺 Phase B 實現。現階段編輯直接由草稿按發佈。",
+      "users": "用戶唯讀視圖喺 Phase B 實現。現階段以 Prisma Studio 為準。",
+      "settings": "設定介面喺 Phase B 實現。現階段喺 Prisma Studio 修改 PlatformSetting 行。"
+    }
   }
 }
