@@ -1102,6 +1102,20 @@
         "metadataSub": "URL 标识、付费档位、分类、作者、标签与合规分级。SEO 覆盖项在下方按翻译单独设置。",
         "translationsHeading": "多语言版本",
         "translationsSub": "至少需要一种语言。当访客的语言版本缺失时,公众站点会优雅回退到已有的语言。",
+        "preview": "预览",
+        "previewTitle": "在新标签页打开公众文章页。草稿会带上 ?preview=1,编辑可见。",
+        "actions": {
+          "publish": "发布",
+          "unpublish": "取消发布",
+          "archive": "归档",
+          "unarchive": "取消归档",
+          "confirmUnpublish": "把这篇文章从公众视图中下线?之后可随时重新发布。",
+          "confirmArchivePublished": "归档已发布的文章?读者将看不到。",
+          "errors": {
+            "illegal": "当前状态不允许该操作。",
+            "missingTranslation": "发布前请至少添加一种语言的翻译。"
+          }
+        },
         "form": {
           "slug": "URL 标识",
           "slugHelp": "仅小写字母、数字与连字符。最终路径为 /articles/<slug>。",
@@ -1186,6 +1200,17 @@
             "trigger": "从其他语言复制…",
             "heading": "源语言",
             "overwriteConfirm": "确定用所选语言的文本替换当前草稿吗?未保存的更改会丢失。"
+          },
+          "htmlSource": {
+            "open": "查看 HTML",
+            "title": "HTML 源码",
+            "close": "关闭",
+            "copy": "复制",
+            "copied": "已复制"
+          },
+          "stats": {
+            "words": "{n} 字",
+            "readingTime": "约 {n} 分钟阅读"
           },
           "picker": {
             "heading": "语言",

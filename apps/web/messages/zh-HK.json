@@ -1102,6 +1102,20 @@
         "metadataSub": "URL 標識、付費檔位、分類、作者、標籤同合規分級。SEO 覆寫選項喺下面按翻譯分開設定。",
         "translationsHeading": "多語言版本",
         "translationsSub": "至少要一種語言。當訪客嘅語言版本缺失時,公眾站台會優雅回退去已有嘅語言。",
+        "preview": "預覽",
+        "previewTitle": "喺新分頁打開公眾文章頁。草稿會帶埋 ?preview=1,編輯可見。",
+        "actions": {
+          "publish": "發佈",
+          "unpublish": "取消發佈",
+          "archive": "歸檔",
+          "unarchive": "解除歸檔",
+          "confirmUnpublish": "將呢篇文章由公眾視圖下線?之後隨時可以重新發佈。",
+          "confirmArchivePublished": "歸檔呢篇已發佈嘅文章?讀者將會見唔到。",
+          "errors": {
+            "illegal": "目前狀態唔允許呢個操作。",
+            "missingTranslation": "發佈前請最少加一種語言嘅翻譯。"
+          }
+        },
         "form": {
           "slug": "URL 標識",
           "slugHelp": "只接受細寫字母、數字同連字符。最後路徑係 /articles/<slug>。",
@@ -1186,6 +1200,17 @@
             "trigger": "由其他語言複製…",
             "heading": "來源語言",
             "overwriteConfirm": "確定用所選語言嘅文本取代當前草稿?未保存嘅修改會冇咗。"
+          },
+          "htmlSource": {
+            "open": "查看 HTML",
+            "title": "HTML 原始碼",
+            "close": "關閉",
+            "copy": "複製",
+            "copied": "已複製"
+          },
+          "stats": {
+            "words": "{n} 字",
+            "readingTime": "約 {n} 分鐘閱讀"
           },
           "picker": {
             "heading": "語言",

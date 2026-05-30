@@ -1429,3 +1429,194 @@ Manual smoke (against local docker DB + Vercel Blob token in
   page, HTML-source toggle, preview tab, word count, Cmd+S.
   Calls the existing `articleTransition()` state machine for
   every transition.
+
+---
+
+### Day 8 — 2026-05-30 — Status actions + HTML source + preview + word count + Cmd+S
+
+Closes: "Can I see what publishes — and click the green button?"
+
+**Shipped**
+
+Server action:
+
+- `apps/web/src/app/[locale]/admin/articles/_actions.ts` —
+  `transitionArticleAction({ articleId, event })`.
+  - Per-event permission: publish/unpublish need
+    `content.publish`; archive/unarchive need `content.archive`.
+  - Loads the article, runs the Day 2 `articleTransition()`
+    state machine, catches `IllegalArticleTransitionError`
+    into a typed `code: "illegal"` result.
+  - "At least one translation required to publish" enforced
+    here as a typed `code: "missingTranslation"`. Other
+    transitions don't check.
+  - Persists status + publishedAt (stamped by the machine on
+    first publish, preserved on re-publish).
+  - Audit row uses the proper `article.published` /
+    `article.unpublished` / `article.archived` /
+    `article.unarchived` keys (added to `AdminAction` type).
+  - revalidatePath: `/admin/articles/[id]/edit` +
+    `/admin/articles` + `/[locale]/articles/[slug]` page
+    (without knowing the slug, refresh the whole slug
+    segment — cheap pre-launch).
+
+Status actions UI:
+
+- `apps/web/src/components/admin/ArticleStatusActions.tsx`
+  — client component. Uses `allowedArticleEvents(status)`
+  from `@aito/domain` so the visible buttons exactly match
+  what the state machine permits. Each event gets an icon,
+  tone (primary / secondary / danger), and an optional
+  confirm prompt (unpublish, archive-of-published).
+  Routes the action call through a single `run(event)`
+  handler that maps each error code to a localised
+  message. On success `router.refresh()` (in a
+  `startTransition`) so the page re-renders with the new
+  status + new button set.
+- `EVENT_META` table maps the four events 1:1 to icon /
+  tone / label key / optional confirm key. Adding a new
+  state-machine event is one entry here + one entry in the
+  zod enum.
+
+Edit-page header rewrite:
+
+- The header now grid-spans title + status badge on the
+  left, slug + Preview link (anchor to
+  `/{locale}/articles/{slug}` with `?preview=1` when the
+  article isn't yet published — opens in a new tab) below
+  the title, and the `<ArticleStatusActions>` row pinned
+  to the right. Action labels + confirm copy come from the
+  new `admin.articles.edit.actions.*` i18n block.
+
+HTML source toggle:
+
+- TranslationEditor gains a "View HTML" button to the
+  right of the body label. Opens a centred modal
+  (`<HtmlSourceModal>`) with a 20-row mono textarea, a
+  Copy-to-clipboard button (1.5s "Copied" feedback), and
+  an Apply button. Modal closes on backdrop click, Esc
+  key, or explicit close button. Editing the HTML and
+  clicking Apply replaces the editor body with the edited
+  HTML; the TipTap `setContent` effect already in
+  `Editor.tsx` (Day 5) reacts.
+
+Word count + reading time:
+
+- `apps/web/src/lib/admin/wordCount.ts` — strips tags +
+  entities with regex (no DOM parse), counts CJK
+  characters individually and Latin words by whitespace
+  delimiters. Reading minutes derived from 250 wpm Latin +
+  500 cpm CJK (CJK halved because per-character density is
+  ~2x). 8 unit tests in `wordCount.test.ts` cover Latin,
+  CJK, mixed (no double-count), tag/entity strip, the
+  1-minute floor, 0 minutes for empty content, and Latin /
+  CJK reading-time scaling.
+- Surfaced under the editor as `"N words · ~M min read"`,
+  refreshed on every body change via `useMemo`. Body is at
+  most a few KB so re-running on every keystroke is fine.
+
+Cmd+S:
+
+- TranslationEditor's form gets `onKeyDown` that traps
+  Cmd+S / Ctrl+S → preventDefault → `saveNow()`. Skips
+  when `busy` so it can't queue duplicate writes.
+
+i18n: 5 new blocks per locale.
+- `edit.preview` / `edit.previewTitle`
+- `edit.actions.*` (button labels + 2 confirm strings +
+  2 error strings)
+- `edit.translations.htmlSource.*` (5 labels)
+- `edit.translations.stats.{words,readingTime}` with `{n}`
+  template tokens
+
+**Verifies**
+
+- `pnpm --filter @aito/web type-check` → clean
+- `pnpm --filter @aito/web test` → 95 passing (87 → 95
+  from 8 new word-count tests)
+- `pnpm --filter @aito/web build` → green. Edit route
+  bundle 146 → 148 kB (status actions + html modal + word
+  count).
+
+Manual smoke (against local docker DB):
+
+1. `pnpm web:dev`, sign in as `demo-admin@aito.io`
+2. Open a seed article → edit page; header shows status
+   badge + Publish / Unpublish / Archive buttons matching
+   the state machine
+3. Click Publish on a draft → confirms publishedAt stamped
+   on the DB row, page refreshes, button set switches to
+   Unpublish + Archive
+4. Click Archive → confirm dialog (because published) → row
+   becomes archived → only Unarchive button shows
+5. Click Unarchive → row goes back to draft (per the state
+   machine's design — unarchive doesn't republish)
+6. Preview link opens public page in new tab; draft article
+   shows the amber preview banner
+7. Body editor: click "View HTML" → modal shows current
+   HTML, edit a `<p>`, click Apply → editor reflects the
+   change → autosave kicks in → save indicator goes green
+8. Word count updates as you type CJK + Latin mixed
+9. Cmd+S in the form forces a save even when autosave
+   hasn't fired yet
+10. Try Publish on an article with zero translations →
+    "Add at least one translation before publishing" error
+    surfaces inline
+
+**Decisions**
+
+- **No `archivedAt` column.** The schema doesn't have one;
+  rather than adding a Phase A migration we let the audit
+  log capture the moment. Phase B can add an
+  `archived_at TIMESTAMPTZ` when reporting actually needs
+  it; the state machine's `archivedAt` field stays as
+  in-memory only.
+- **revalidatePath for the public slug segment.** We don't
+  have the slug at hand without an extra query. With near-
+  zero pre-launch traffic the cost of revalidating the
+  whole `[slug]` segment is invisible; post-launch we can
+  optimise by selecting the slug in the same query that
+  loads `before`.
+- **`allowedArticleEvents()` drives the button set.** The
+  visible action buttons are derived from the state
+  machine, not hardcoded. Adding a new event in
+  `packages/domain/src/article.ts` automatically lights up
+  in the UI as long as `EVENT_META` knows about it. One
+  source of truth.
+- **Confirm prompts only on destructive transitions.**
+  Unpublish always confirms (removing live content);
+  archive confirms *only* when archiving a published row
+  (a draft archive is harmless and shouldn't nag). Publish
+  + unarchive get no confirm — they're additive.
+- **HTML source modal is centred + backdrop, not inline
+  panel.** Inline panels would push the editor down and
+  break the typing context. A modal preserves cursor
+  position when closed and gives more vertical room for
+  raw HTML.
+- **Apply, don't auto-replace.** The modal could replace
+  body on every keystroke, but a typo in the HTML field
+  shouldn't corrupt the editor until the user explicitly
+  applies it. Apply also lets the editor verify visually
+  before committing.
+- **Cmd+S preventDefault.** Even on macOS Safari (where
+  Cmd+S triggers the browser's Save Page dialog) we capture
+  the chord. Power users expect it; the autosave story
+  works without it for non-power users.
+- **Word count regex over DOM parse.** A DOM parse is more
+  correct (entity-aware, doesn't trip on `< inside attr`)
+  but TipTap-produced HTML is well-formed and CJK editors
+  expect per-character count anyway. Regex is fast enough
+  for live updates.
+- **CJK reading rate 500 cpm.** Empirical: industry guides
+  put Mandarin reading at 250-300 words/min, where a
+  "word" averages ~1.6 characters. 500 cpm rounds to that.
+  Pace varies per genre but the readability difference
+  between 8 and 9 minutes isn't worth caring about.
+
+**Carry-over**
+
+- Day 9: zh-CN/zh-HK admin-i18n batch pass (or skip — most
+  is already done because we translated as we went); E2E
+  Playwright test covering create → publish → public-site
+  reads; admin runbook + admin backlog docs; staging
+  deploy walkthrough.

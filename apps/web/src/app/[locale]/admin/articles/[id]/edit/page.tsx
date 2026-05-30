@@ -1,10 +1,11 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { Link } from "@/i18n/routing";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { prisma, Locale as DbLocale } from "@aito/database";
 import { requireStaff } from "@/lib/auth/staff";
 import { ArticleStatusBadge } from "@/components/admin/ArticleStatusBadge";
+import { ArticleStatusActions } from "@/components/admin/ArticleStatusActions";
 import { MetadataForm } from "@/components/admin/MetadataForm";
 import { TranslationTabs } from "@/components/admin/TranslationTabs";
 
@@ -75,6 +76,7 @@ export default async function EditArticlePage({
   const tForm = await getTranslations("admin.articles.edit.form");
   const tTabs = await getTranslations("admin.articles.edit.translations");
   const tToolbar = await getTranslations("admin.articles.edit.toolbar");
+  const tActions = await getTranslations("admin.articles.edit.actions");
 
   // Translate DB locales → UI locale strings the form components speak.
   const existingTranslations = article.translations
@@ -109,13 +111,51 @@ export default async function EditArticlePage({
         <ArrowLeft className="size-4" /> {t("backToList")}
       </Link>
 
-      <header className="mt-4 flex flex-wrap items-baseline gap-3">
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-fg">
-          {heroTitle}
-        </h1>
-        <ArticleStatusBadge status={article.status} />
+      <header className="mt-4 flex flex-wrap items-start justify-between gap-6">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-baseline gap-3">
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-fg">
+              {heroTitle}
+            </h1>
+            <ArticleStatusBadge status={article.status} />
+          </div>
+          <p className="mt-1 flex items-center gap-3 font-mono text-xs text-fg-soft">
+            <span>/{article.slug}</span>
+            <a
+              href={`/${locale}/articles/${article.slug}${
+                article.status === "published" ? "" : "?preview=1"
+              }`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 normal-case tracking-normal text-fg-muted hover:text-fg"
+              title={t("previewTitle")}
+            >
+              <ExternalLink className="size-3" />
+              {t("preview")}
+            </a>
+          </p>
+        </div>
+        <ArticleStatusActions
+          articleId={article.id}
+          status={article.status}
+          labels={{
+            publish: tActions("publish"),
+            unpublish: tActions("unpublish"),
+            archive: tActions("archive"),
+            unarchive: tActions("unarchive"),
+            confirmUnpublish: tActions("confirmUnpublish"),
+            confirmArchivePublished: tActions("confirmArchivePublished"),
+            errors: {
+              illegal: tActions("errors.illegal"),
+              missingTranslation: tActions("errors.missingTranslation"),
+              notFound: tForm("errors.notFound"),
+              permissionDenied: tForm("errors.permissionDenied"),
+              notStaff: tForm("errors.notStaff"),
+              internal: tForm("errors.internal"),
+            },
+          }}
+        />
       </header>
-      <p className="mt-1 font-mono text-xs text-fg-soft">/{article.slug}</p>
 
       {/* Metadata section */}
       <section className="mt-10">
@@ -261,6 +301,17 @@ export default async function EditArticlePage({
                 trigger: tTabs("copyFromLocale.trigger"),
                 heading: tTabs("copyFromLocale.heading"),
                 overwriteConfirm: tTabs("copyFromLocale.overwriteConfirm"),
+              },
+              htmlSource: {
+                open: tTabs("htmlSource.open"),
+                title: tTabs("htmlSource.title"),
+                close: tTabs("htmlSource.close"),
+                copy: tTabs("htmlSource.copy"),
+                copied: tTabs("htmlSource.copied"),
+              },
+              stats: {
+                words: tTabs("stats.words"),
+                readingTime: tTabs("stats.readingTime"),
               },
               errors: {
                 validation: tForm("errors.validation"),

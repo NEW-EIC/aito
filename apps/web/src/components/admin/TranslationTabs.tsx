@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
-import { Loader2, Plus, AlertCircle } from "lucide-react";
+import { Loader2, Plus, AlertCircle, Code, X } from "lucide-react";
 import {
   updateTranslationAction,
   addTranslationAction,
@@ -12,6 +12,7 @@ import {
 import { SaveIndicator } from "./SaveIndicator";
 import { Editor } from "./editor/Editor";
 import type { ToolbarLabels } from "./editor/Toolbar";
+import { countWords } from "@/lib/admin/wordCount";
 
 export interface ExistingTranslation {
   locale: string;
@@ -52,6 +53,19 @@ interface Labels {
     trigger: string;
     heading: string;
     overwriteConfirm: string;
+  };
+  htmlSource: {
+    open: string;
+    title: string;
+    close: string;
+    copy: string;
+    copied: string;
+  };
+  stats: {
+    /** "{n} words" or "{n} 字" depending on locale */
+    words: string;
+    /** "~{n} min read" */
+    readingTime: string;
   };
   save: string;
   saving: string;
@@ -355,6 +369,11 @@ function TranslationEditor({
   >({});
   const [autosaveState, setAutosaveState] =
     useState<"idle" | "saving" | "failed">("idle");
+  const [htmlOpen, setHtmlOpen] = useState(false);
+
+  // Word + reading-time stats, derived from the body HTML on every
+  // change. Cheap — body is at most a few KB.
+  const wordStats = useMemo(() => countWords(body), [body]);
 
   // Mirror the latest snapshot of all fields in a ref so the autosave
   // debounce closure always reads fresh values without recreating itself.
@@ -496,8 +515,22 @@ function TranslationEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, subtitle, excerpt, body, seoTitle, seoDescription, dirty, busy]);
 
+  // Cmd+S / Ctrl+S anywhere in the form forces a save. The browser's
+  // default behaviour (save the page) is suppressed.
+  function onKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      if (!busy) void saveNow();
+    }
+  }
+
   return (
-    <form onSubmit={onSubmit} className="mt-6 space-y-5" noValidate>
+    <form
+      onSubmit={onSubmit}
+      onKeyDown={onKeyDown}
+      className="mt-6 space-y-5"
+      noValidate
+    >
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-fg-soft">
         <span>
           {labels.version} {initial.version}
@@ -578,9 +611,19 @@ function TranslationEditor({
       </div>
 
       <div>
-        <label className="mb-1.5 block text-sm font-medium text-fg">
-          {labels.fields.body}
-        </label>
+        <div className="mb-1.5 flex items-center justify-between">
+          <label className="block text-sm font-medium text-fg">
+            {labels.fields.body}
+          </label>
+          <button
+            type="button"
+            onClick={() => setHtmlOpen(true)}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-fg-muted hover:bg-bg-alt hover:text-fg"
+          >
+            <Code className="size-3.5" />
+            {labels.htmlSource.open}
+          </button>
+        </div>
         <Editor
           initialHTML={initial.body}
           onChange={setBody}
@@ -588,7 +631,7 @@ function TranslationEditor({
           toolbarLabels={labels.toolbar}
           disabled={busy}
         />
-        <div className="mt-1.5 flex items-center justify-between text-xs">
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-xs">
           <p className="text-fg-soft">
             {autosaveState === "saving"
               ? labels.autosave.saving
@@ -596,7 +639,30 @@ function TranslationEditor({
                 ? <span className="text-rose-600 dark:text-rose-400">{labels.autosave.failed}</span>
                 : labels.autosave.idle}
           </p>
+          <p className="text-fg-soft tabular-nums-feature">
+            {labels.stats.words.replace("{n}", String(wordStats.totalUnits))}
+            {wordStats.readingMinutes > 0 && (
+              <>
+                {" · "}
+                {labels.stats.readingTime.replace(
+                  "{n}",
+                  String(wordStats.readingMinutes),
+                )}
+              </>
+            )}
+          </p>
         </div>
+        {htmlOpen && (
+          <HtmlSourceModal
+            html={body}
+            onClose={() => setHtmlOpen(false)}
+            onApply={(next) => {
+              setBody(next);
+              setHtmlOpen(false);
+            }}
+            labels={labels.htmlSource}
+          />
+        )}
       </div>
 
       <details className="rounded-md border border-border bg-bg-alt/30 p-3 text-sm">
@@ -696,4 +762,107 @@ function closeNearestDetails() {
   if (!(active instanceof HTMLElement)) return;
   const details = active.closest("details");
   if (details) details.removeAttribute("open");
+}
+
+// ─── HTML source viewer / editor ─────────────────────────────────────────
+
+function HtmlSourceModal({
+  html,
+  onClose,
+  onApply,
+  labels,
+}: {
+  html: string;
+  onClose: () => void;
+  onApply: (next: string) => void;
+  labels: {
+    title: string;
+    close: string;
+    copy: string;
+    copied: string;
+  };
+}) {
+  const [draft, setDraft] = useState(html);
+  const [copied, setCopied] = useState(false);
+
+  // Esc closes the modal; preserves Web app convention.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(draft);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Older browsers / blocked permission — silent fail, user can
+      // still select + copy from the textarea.
+    }
+  }
+
+  const dirty = draft !== html;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex max-h-[80vh] w-[min(48rem,90vw)] flex-col rounded-card border border-border bg-surface shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h3 className="font-display text-base font-semibold text-fg">
+            {labels.title}
+          </h3>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={copy}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-fg-muted hover:bg-bg-alt hover:text-fg"
+            >
+              {copied ? labels.copied : labels.copy}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex size-7 items-center justify-center rounded-md text-fg-muted hover:bg-bg-alt hover:text-fg"
+              aria-label={labels.close}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </header>
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          spellCheck={false}
+          className="flex-1 resize-none border-0 bg-transparent p-4 font-mono text-xs leading-relaxed text-fg focus:outline-none"
+          rows={20}
+        />
+        <footer className="flex items-center justify-end gap-2 border-t border-border bg-bg-alt/30 px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 items-center justify-center rounded-pill border border-border px-4 text-sm text-fg hover:bg-bg-alt"
+          >
+            {labels.close}
+          </button>
+          <button
+            type="button"
+            disabled={!dirty}
+            onClick={() => onApply(draft)}
+            className="inline-flex h-9 items-center justify-center rounded-pill bg-fg px-4 text-sm font-medium text-bg disabled:opacity-50"
+          >
+            Apply
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
 }

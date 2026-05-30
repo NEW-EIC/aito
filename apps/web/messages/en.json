@@ -1102,6 +1102,20 @@
         "metadataSub": "Slug, plan tier, category, authors, tags, and compliance settings. SEO overrides live per-translation below.",
         "translationsHeading": "Translations",
         "translationsSub": "At least one language is required. The public site falls back to whichever locale is filled when a visitor's preference is missing.",
+        "preview": "Preview",
+        "previewTitle": "Open the public article page in a new tab. Drafts get ?preview=1 so staff can see them.",
+        "actions": {
+          "publish": "Publish",
+          "unpublish": "Unpublish",
+          "archive": "Archive",
+          "unarchive": "Unarchive",
+          "confirmUnpublish": "Pull this article from public view? You can republish at any time.",
+          "confirmArchivePublished": "Archive this published article? Readers will no longer see it.",
+          "errors": {
+            "illegal": "That transition isn't allowed from the current status.",
+            "missingTranslation": "Add at least one translation before publishing."
+          }
+        },
         "form": {
           "slug": "URL slug",
           "slugHelp": "Lowercase letters, numbers, and dashes only. Becomes /articles/<slug>.",
@@ -1186,6 +1200,17 @@
             "trigger": "Copy from…",
             "heading": "Source language",
             "overwriteConfirm": "Replace the current draft with the source language's text? Your unsaved changes will be lost."
+          },
+          "htmlSource": {
+            "open": "View HTML",
+            "title": "HTML source",
+            "close": "Close",
+            "copy": "Copy",
+            "copied": "Copied"
+          },
+          "stats": {
+            "words": "{n} words",
+            "readingTime": "~{n} min read"
           },
           "picker": {
             "heading": "Language",

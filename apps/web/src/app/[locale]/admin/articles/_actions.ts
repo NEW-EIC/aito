@@ -21,8 +21,13 @@ import {
   Prisma,
 } from "@aito/database";
 import { requirePermission, StaffAuthError } from "@/lib/auth/staff";
-import { recordAuditLog } from "@/lib/admin/audit";
+import { recordAuditLog, type AdminAction } from "@/lib/admin/audit";
 import { suggestSlug } from "@/lib/admin/slug";
+import {
+  articleTransition,
+  IllegalArticleTransitionError,
+  type ArticleEvent,
+} from "@aito/domain";
 
 const TranslationLocale = z.enum(["en", "zh-CN", "zh-HK"]);
 type UiLocale = z.infer<typeof TranslationLocale>;
@@ -560,4 +565,169 @@ export async function addTranslationAction(
 
   revalidatePath(`/admin/articles/${input.articleId}/edit`);
   return { ok: true };
+}
+
+// ─── Transition (Publish / Unpublish / Archive / Unarchive) ─────────────
+
+const TransitionInput = z.object({
+  articleId: z.string().uuid(),
+  event: z.enum(["publish", "unpublish", "archive", "unarchive"]),
+});
+
+export type TransitionInput = z.infer<typeof TransitionInput>;
+
+export type TransitionResult =
+  | { ok: true; newStatus: string }
+  | {
+      ok: false;
+      code:
+        | "validation"
+        | "notFound"
+        | "illegal"
+        | "missingTranslation"
+        | "permissionDenied"
+        | "notStaff"
+        | "internal";
+      message?: string;
+    };
+
+/** Map a domain event to the matching `content.*` permission. publish /
+ *  unpublish need `content.publish`; archive flow needs `content.archive`. */
+function permissionForEvent(event: ArticleEvent["type"]): string {
+  switch (event) {
+    case "publish":
+    case "unpublish":
+      return "content.publish";
+    case "archive":
+    case "unarchive":
+      return "content.archive";
+  }
+}
+
+/** Map a domain event to the AdminAction key written to the audit log. */
+function auditKeyForEvent(event: ArticleEvent["type"]): AdminAction {
+  switch (event) {
+    case "publish":
+      return "article.published";
+    case "unpublish":
+      return "article.unpublished";
+    case "archive":
+      return "article.archived";
+    case "unarchive":
+      return "article.unarchived";
+  }
+}
+
+export async function transitionArticleAction(
+  raw: unknown,
+): Promise<TransitionResult> {
+  // Validate first so we know which permission to check.
+  const parsed = TransitionInput.safeParse(raw);
+  if (!parsed.success) return { ok: false, code: "validation" };
+  const input = parsed.data;
+
+  // Permission depends on the event.
+  let actorId: string;
+  try {
+    const ctx = await requirePermission(permissionForEvent(input.event));
+    actorId = ctx.userId;
+  } catch (err) {
+    if (err instanceof StaffAuthError) {
+      return {
+        ok: false,
+        code: err.code === "not_staff" ? "notStaff" : "permissionDenied",
+        message: err.message,
+      };
+    }
+    throw err;
+  }
+
+  // Load current state for the state machine + the publish-time
+  // "at least one translation" check.
+  const before = await prisma.article.findUnique({
+    where: { id: input.articleId },
+    select: {
+      id: true,
+      status: true,
+      publishedAt: true,
+      translations: { select: { id: true } },
+    },
+  });
+  if (!before) return { ok: false, code: "notFound" };
+
+  // Phase A rule: an article can only become `published` if it has at
+  // least one translation (with the relaxed any-language rule we
+  // agreed to on Day 0). Other transitions don't enforce this.
+  if (input.event === "publish" && before.translations.length === 0) {
+    return { ok: false, code: "missingTranslation" };
+  }
+
+  // Run the state machine to compute the next state + lifecycle
+  // timestamps. articleTransition throws IllegalArticleTransitionError
+  // on a forbidden edge — turn that into a typed result rather than
+  // letting it bubble.
+  let next;
+  try {
+    next = articleTransition(
+      {
+        id: before.id,
+        state: before.status as unknown as Parameters<
+          typeof articleTransition
+        >[0]["state"],
+        publishedAt: before.publishedAt ?? undefined,
+      },
+      { type: input.event },
+    );
+  } catch (err) {
+    if (err instanceof IllegalArticleTransitionError) {
+      return { ok: false, code: "illegal", message: err.message };
+    }
+    throw err;
+  }
+
+  // Persist. publishedAt is stamped by the state machine on first
+  // publish and preserved on re-publish; archivedAt isn't a schema
+  // column (we don't have one) so we drop it. Phase B can add an
+  // archived_at column if reporting needs it; for now the audit log
+  // captures the moment.
+  await prisma.article.update({
+    where: { id: input.articleId },
+    data: {
+      status: next.state as unknown as
+        | "draft"
+        | "in_review"
+        | "legal_review"
+        | "scheduled"
+        | "published"
+        | "archived",
+      publishedAt: next.publishedAt ?? null,
+    },
+  });
+
+  await recordAuditLog({
+    action: auditKeyForEvent(input.event),
+    actorId,
+    resourceType: "article",
+    resourceId: input.articleId,
+    oldValue: {
+      status: before.status,
+      publishedAt: before.publishedAt?.toISOString() ?? null,
+    },
+    newValue: {
+      status: next.state,
+      publishedAt: next.publishedAt?.toISOString() ?? null,
+    },
+    metadata: { source: "transitionArticleAction", event: input.event },
+  });
+
+  revalidatePath(`/admin/articles/${input.articleId}/edit`);
+  revalidatePath("/admin/articles");
+  // Public article page also needs refresh when state changes affect
+  // visibility (published → other = pull from cache; other → published
+  // = make visible).
+  // Don't have the slug at hand without an extra query; revalidate the
+  // entire /articles segment instead — cheap, no users yet.
+  revalidatePath("/[locale]/articles/[slug]", "page");
+
+  return { ok: true, newStatus: next.state };
 }
