@@ -97,14 +97,20 @@ export function Editor({
     if (targetPos === null) return; // node was deleted during upload
 
     if (!result.ok) {
-      // Remove the placeholder + show a non-blocking message via the
-      // browser's prompt-less alert path. Phase B could replace this
-      // with a toast.
+      // Remove the placeholder + flag the failure. Phase B will hook a
+      // proper toast component in; for now the inline alert + console
+      // log are enough for editors to know something went wrong.
       ed.chain()
         .focus()
         .deleteRange({ from: targetPos, to: targetPos + 1 })
         .run();
-      console.warn(`[editor] image upload failed (${result.code}):`, result.message);
+      const msg = `Image upload failed (${result.code}): ${result.message ?? ""}`;
+      console.error("[editor]", msg);
+      // Use alert sparingly — but silently dropping the placeholder
+      // would leave editors wondering why drag-drop "did nothing".
+      if (typeof window !== "undefined") {
+        window.setTimeout(() => window.alert(msg), 0);
+      }
       return;
     }
 
@@ -194,6 +200,20 @@ export function Editor({
       // `transformPastedText` (unused here — TipTap turns text into
       // paragraphs natively, no sanitising needed for text).
       transformPastedHTML: (html) => sanitizeHtml(html),
+      // Dragover must preventDefault for the drop to actually fire; the
+      // browser's default reaction to a dropped file is to navigate to
+      // it. ProseMirror handles this for some events but not reliably
+      // for cross-origin file drops in every browser; this hook makes it
+      // explicit. We only intercept when the drag carries files (text
+      // drag-and-drop inside the editor still works normally).
+      handleDOMEvents: {
+        dragover: (_view, event) => {
+          if (event.dataTransfer?.types?.includes("Files")) {
+            event.preventDefault();
+          }
+          return false;
+        },
+      },
       // Drag-drop a file from Finder/Explorer onto the editor.
       handleDrop(view, event, _slice, moved) {
         if (moved) return false; // internal node drag, let TipTap handle

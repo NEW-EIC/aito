@@ -208,7 +208,7 @@ export default async function ArticlesIndexPage({
         </Link>
       </header>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border">
         <nav aria-label="Filter by status" className="-mb-px flex gap-1">
           {tabs.map((tab) => {
             const isActive = tab.key === activeFilter;
@@ -224,18 +224,21 @@ export default async function ArticlesIndexPage({
                 ].join(" ")}
               >
                 {t(tab.labelKey)}
-                <span className="rounded-pill bg-fg-muted/15 px-1.5 py-0.5 text-[10px] font-medium tabular-nums-feature text-fg-muted">
+                <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-fg-muted/15 px-1.5 text-[10px] font-medium tabular-nums-feature text-fg-muted">
                   {tab.count}
                 </span>
               </Link>
             );
           })}
         </nav>
-        <ArticleSearchBox
-          initialValue={query}
-          placeholder={t("searchPlaceholder")}
-          activeFilter={activeFilter}
-        />
+        <div className="mb-2">
+          <ArticleSearchBox
+            initialValue={query}
+            placeholder={t("searchPlaceholder")}
+            activeFilter={activeFilter}
+            locale={locale}
+          />
+        </div>
       </div>
 
       {rows.length === 0 ? (

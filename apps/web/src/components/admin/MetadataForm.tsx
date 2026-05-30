@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
 import {
   updateArticleMetadataAction,
+  createAuthorAction,
   type UpdateMetadataInput,
   type UpdateMetadataResult,
 } from "@/app/[locale]/admin/articles/_actions";
@@ -40,6 +41,7 @@ interface Labels {
   categoryNone: string;
   authors: string;
   authorsEmpty: string;
+  authorsCreateNew: string;
   tags: string;
   tagsEmpty: string;
   heroImageUrl: string;
@@ -271,6 +273,12 @@ export function MetadataForm({ articleId, initial, options, labels }: Props) {
           selectedIds={authorIds}
           onChange={setAuthorIds}
           emptyLabel={labels.authorsEmpty}
+          createLabel={labels.authorsCreateNew}
+          onCreate={async (name) => {
+            const result = await createAuthorAction({ name });
+            if (!result.ok) return null;
+            return { id: result.author.id, name: result.author.name };
+          }}
         />
       </Field>
 

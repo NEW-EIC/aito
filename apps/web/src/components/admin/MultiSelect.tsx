@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Check, Plus, X } from "lucide-react";
+import { Check, Plus, X, Loader2 } from "lucide-react";
 
 interface Option {
   id: string;
@@ -14,6 +14,12 @@ interface Props {
   selectedIds: string[];
   onChange: (ids: string[]) => void;
   emptyLabel: string;
+  /** Optional create-from-search. When provided, the dropdown shows a
+   *  "Create new: …" row when nothing matches the query. Callback
+   *  returns the newly-created Option (with a real id from the server)
+   *  or null on failure. */
+  onCreate?: (name: string) => Promise<Option | null>;
+  createLabel?: string;
 }
 
 /**
@@ -22,9 +28,22 @@ interface Props {
  * on click. Phase A doesn't need create-new — Phase B can swap this for
  * a Combobox with create.
  */
-export function MultiSelect({ options, selectedIds, onChange, emptyLabel }: Props) {
+export function MultiSelect({
+  options,
+  selectedIds,
+  onChange,
+  emptyLabel,
+  onCreate,
+  createLabel,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
+  // We keep options the parent passed PLUS any we've created locally
+  // since the parent prop reflects the original server fetch. The
+  // parent revalidates on next nav but the optimistic add gives the
+  // editor an immediate green tick.
+  const [locallyAdded, setLocallyAdded] = useState<Option[]>([]);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,14 +57,27 @@ export function MultiSelect({ options, selectedIds, onChange, emptyLabel }: Prop
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open]);
 
+  // Combine server-fetched options with locally-created ones so the
+  // pill chips and the dropdown both reflect the just-created row.
+  const allOptions = [...options, ...locallyAdded];
   const selectedSet = new Set(selectedIds);
-  const selected = options.filter((o) => selectedSet.has(o.id));
-  const available = options
+  const selected = allOptions.filter((o) => selectedSet.has(o.id));
+  const queryTrim = query.trim();
+  const available = allOptions
     .filter((o) => !selectedSet.has(o.id))
     .filter((o) =>
-      query.trim() === ""
+      queryTrim === ""
         ? true
-        : o.name.toLowerCase().includes(query.toLowerCase()),
+        : o.name.toLowerCase().includes(queryTrim.toLowerCase()),
+    );
+  // Show the "Create new: …" affordance when the user has typed a
+  // non-trivial query that doesn't match any existing option (case-
+  // insensitive, full equality on .name).
+  const canCreate =
+    !!onCreate &&
+    queryTrim.length > 1 &&
+    !allOptions.some(
+      (o) => o.name.toLowerCase() === queryTrim.toLowerCase(),
     );
 
   function add(id: string) {
@@ -54,6 +86,21 @@ export function MultiSelect({ options, selectedIds, onChange, emptyLabel }: Prop
   }
   function remove(id: string) {
     onChange(selectedIds.filter((x) => x !== id));
+  }
+  async function create() {
+    if (!onCreate || creating) return;
+    const name = queryTrim;
+    if (!name) return;
+    setCreating(true);
+    try {
+      const created = await onCreate(name);
+      if (created) {
+        setLocallyAdded((prev) => [...prev, created]);
+        add(created.id);
+      }
+    } finally {
+      setCreating(false);
+    }
   }
 
   return (
@@ -97,7 +144,7 @@ export function MultiSelect({ options, selectedIds, onChange, emptyLabel }: Prop
             className="w-full border-b border-border bg-transparent px-3 py-2 text-sm text-fg placeholder:text-fg-soft focus:outline-none"
             autoFocus
           />
-          {available.length === 0 ? (
+          {available.length === 0 && !canCreate ? (
             <p className="px-3 py-2 text-xs text-fg-soft">
               {query ? "No matches" : "Nothing left to add"}
             </p>
@@ -120,6 +167,26 @@ export function MultiSelect({ options, selectedIds, onChange, emptyLabel }: Prop
                   </button>
                 </li>
               ))}
+              {canCreate && (
+                <li className="border-t border-border">
+                  <button
+                    type="button"
+                    onClick={create}
+                    disabled={creating}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-fg hover:bg-bg-alt disabled:opacity-60"
+                  >
+                    {creating ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="size-3.5" />
+                    )}
+                    <span>
+                      {createLabel ?? "Create new"}:{" "}
+                      <strong>{queryTrim}</strong>
+                    </span>
+                  </button>
+                </li>
+              )}
             </ul>
           )}
         </div>

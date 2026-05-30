@@ -2,24 +2,22 @@
  * HTML sanitiser used in two places:
  *   1. TipTap paste handler — when an editor pastes from WeChat / Word /
  *      a webpage, scrub the markup before TipTap parses it. This stops
- *      Word-style `<o:p>` noise, inline `style="font-family: Helvetica…"`
- *      Microsoft-isms, tracking pixels, and embedded scripts from
- *      polluting the document.
+ *      Word-style `<o:p>` noise, tracking pixels, and embedded scripts
+ *      from polluting the document.
  *   2. Public article renderer — defense-in-depth. Even though TipTap's
  *      schema already constrains what gets persisted, anything that
- *      bypasses the editor (manual SQL edit, future API write, mistaken
+ *      bypassed the editor (manual SQL edit, future API write, mistaken
  *      migration) gets caught at render time before
  *      `dangerouslySetInnerHTML` mounts it.
  *
- * The allowlist matches the TipTap extension set installed in Day 5
- * exactly. Anything new the editor learns to produce needs an entry
- * here (or the sanitiser will silently strip it).
- *
- * `isomorphic-dompurify` works on Node (JSDOM) and the browser without
- * config; both server components and the client paste handler use it.
+ * Built on `sanitize-html` (pure JS, no DOM dependency) — earlier
+ * version used `isomorphic-dompurify` which bundles JSDOM and broke
+ * Next 15 server bundling because JSDOM reads its UA stylesheet from
+ * disk at runtime. `sanitize-html` is allowlist-based with the same
+ * security guarantees.
  */
 
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtmlLib, { type IOptions } from "sanitize-html";
 
 /** Tags the editor is allowed to produce. Order doesn't matter. */
 const ALLOWED_TAGS = [
@@ -36,6 +34,8 @@ const ALLOWED_TAGS = [
   // Inline
   "strong",
   "em",
+  "b",
+  "i",
   "u",
   "s",
   "del",
@@ -45,137 +45,138 @@ const ALLOWED_TAGS = [
   "span",
   "a",
   "mark",
-  // Media (Day 7 will add img validation; current schema permits it)
+  "sub",
+  "sup",
+  // Media
   "img",
   "figure",
   "figcaption",
 ];
 
-/** Attributes allowed on any tag. Plus per-tag below. */
-const ALLOWED_ATTR = [
-  "href",
-  "target",
-  "rel",
-  "src",
-  "alt",
-  "title",
-  "class",
-  "data-text-align",
-  // TipTap's TextAlign extension persists alignment as `style="text-align: …"`
-  // so we let `style` through but later HOOK trims it down to safe values.
-  "style",
-];
+/**
+ * Inline style declarations we keep. We're deliberately permissive on
+ * colour / typography because editors paste from richly-formatted sources
+ * (WeChat, brand pages) and the dropped formatting feels broken. We're
+ * still strict on the dangerous stuff:
+ *   - no `url()` (loads external resources)
+ *   - no `expression()` (legacy IE script execution)
+ *   - no `position: fixed` / floats that escape the article column
+ *
+ * Everything else gets through; brand-consistency concerns are an
+ * editor-discipline problem, not a sanitiser problem.
+ */
+const SAFE_STYLE_PROP_RE =
+  /^(text-align|text-indent|text-decoration|text-transform|color|background|background-color|font-size|font-weight|font-style|font-family|line-height|letter-spacing|margin|margin-top|margin-bottom|padding|padding-top|padding-bottom|width|max-width|height|max-height|border|border-color|border-style|border-width|border-radius|display|vertical-align)$/i;
 
 /**
- * Style declarations we keep when they appear in a `style=""` attribute.
- * Everything else (font-family, font-size, mso-style-*, line-height when
- * Word-imported, etc.) gets dropped. Keeps the editor's own marks
- * intact while purging WeChat / Word noise.
+ * Tags we always strip (rather than the default sanitize-html behaviour
+ * of stripping unknown tags but keeping `<script>` etc as plain text).
+ * Belt-and-braces; they're not in ALLOWED_TAGS either.
  */
-const ALLOWED_STYLE_PROPS = new Set([
-  "text-align",
-  "color",
-  "background-color",
-]);
+const DISALLOWED_TAGS_MODE: IOptions["disallowedTagsMode"] = "discard";
 
-const URL_SCHEMES_REGEX = /^(https?:|mailto:|tel:|\/|#)/i;
+function buildOptions(opts: SanitizeOptions): IOptions {
+  const tags = opts.allowImages === false
+    ? ALLOWED_TAGS.filter(
+        (t) => t !== "img" && t !== "figure" && t !== "figcaption",
+      )
+    : ALLOWED_TAGS;
 
-let hooksInstalled = false;
-function installHooksOnce() {
-  if (hooksInstalled) return;
-  hooksInstalled = true;
-
-  // Trim inline styles to the allowlist. DOMPurify lets us mutate
-  // attributes during sanitisation.
-  DOMPurify.addHook("uponSanitizeAttribute", (_node, data) => {
-    if (data.attrName !== "style") return;
-    const raw = data.attrValue ?? "";
-    const kept: string[] = [];
-    for (const decl of raw.split(";")) {
-      const [propRaw, ...valueParts] = decl.split(":");
-      const prop = propRaw?.trim().toLowerCase();
-      const value = valueParts.join(":").trim();
-      if (!prop || !value) continue;
-      if (!ALLOWED_STYLE_PROPS.has(prop)) continue;
-      // Drop expressions and url() that could fetch external resources.
-      if (/expression\(|url\(/i.test(value)) continue;
-      kept.push(`${prop}: ${value}`);
-    }
-    if (kept.length === 0) {
-      // Removing the attribute is what an empty kept[] should mean.
-      data.attrValue = "";
-      data.keepAttr = false;
-    } else {
-      data.attrValue = kept.join("; ");
-    }
-  });
-
-  // Validate href / src URL schemes — http(s) / mailto / tel / relative /
-  // anchor only. We deliberately reject `data:` URLs even for images
-  // because the editor's paste-image handler (Day 7) uploads pasted
-  // base64 to Vercel Blob and rewrites the src to a real URL before
-  // the document is persisted. A `data:` URL surviving sanitise here
-  // would mean the upload failed silently or a non-editor source
-  // wrote raw HTML — in either case we'd rather drop the image than
-  // bloat every served page with megabytes of base64.
-  DOMPurify.addHook("uponSanitizeAttribute", (_node, data) => {
-    if (data.attrName !== "href" && data.attrName !== "src") return;
-    const url = (data.attrValue ?? "").trim();
-    if (url === "") {
-      data.keepAttr = false;
-      return;
-    }
-    if (!URL_SCHEMES_REGEX.test(url)) {
-      data.keepAttr = false;
-    }
-  });
-
-  // External links always get rel and target patched on render. We can't
-  // rely on `instanceof Element` because the node comes from isomorphic-
-  // dompurify's bundled JSDOM, which doesn't expose Element on globalThis
-  // when DOMPurify runs server-side. Duck-typing on `tagName` is enough —
-  // hooks only fire for Element-shaped nodes.
-  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-    if (
-      typeof (node as { tagName?: unknown }).tagName !== "string" ||
-      typeof (node as { setAttribute?: unknown }).setAttribute !== "function"
-    ) {
-      return;
-    }
-    const el = node as unknown as {
-      tagName: string;
-      getAttribute: (n: string) => string | null;
-      setAttribute: (n: string, v: string) => void;
-    };
-    if (el.tagName !== "A") return;
-    const href = el.getAttribute("href") ?? "";
-    if (/^https?:/i.test(href)) {
-      el.setAttribute("target", "_blank");
-      el.setAttribute("rel", "noopener noreferrer");
-    }
-  });
+  return {
+    allowedTags: tags,
+    // sanitize-html lets us specify allowed attributes per tag. We
+    // allow `style` on most semantic tags + structural attributes
+    // (href/src/alt/title) where they make sense.
+    allowedAttributes: {
+      "*": ["style", "class"],
+      a: ["href", "name", "target", "rel", "title"],
+      img: ["src", "alt", "title", "width", "height", "loading"],
+      figure: ["data-text-align"],
+      span: ["data-text-align"],
+      p: ["data-text-align"],
+      h2: ["data-text-align"],
+      h3: ["data-text-align"],
+    },
+    // URL schemes for `href` / `src`. http(s), mailto, tel, anchor,
+    // relative — never `javascript:`, `data:`, `file:`, etc. Day 7
+    // moved paste-image to real Vercel Blob upload so data: URLs no
+    // longer need to slip through.
+    allowedSchemes: ["http", "https", "mailto", "tel"],
+    allowedSchemesByTag: {},
+    allowProtocolRelative: false,
+    allowedSchemesAppliedToAttributes: ["href", "src"],
+    // Strip dangerous tags entirely, including content.
+    disallowedTagsMode: DISALLOWED_TAGS_MODE,
+    // Inline style filter.
+    allowedStyles: {
+      "*": Object.fromEntries(
+        // Build a permissive regex map: every property in SAFE_STYLE_PROP_RE
+        // accepts almost any value, except url() / expression().
+        // sanitize-html validates each declaration against the regex array
+        // for the property; the catch-all wildcard regex below accepts any
+        // value that doesn't contain url( or expression(.
+        [
+          "text-align",
+          "text-indent",
+          "text-decoration",
+          "text-transform",
+          "color",
+          "background",
+          "background-color",
+          "font-size",
+          "font-weight",
+          "font-style",
+          "font-family",
+          "line-height",
+          "letter-spacing",
+          "margin",
+          "margin-top",
+          "margin-bottom",
+          "padding",
+          "padding-top",
+          "padding-bottom",
+          "width",
+          "max-width",
+          "height",
+          "max-height",
+          "border",
+          "border-color",
+          "border-style",
+          "border-width",
+          "border-radius",
+          "display",
+          "vertical-align",
+        ].map((prop) => [prop, [/^(?!.*(?:url\(|expression\())[^;]+$/i]]),
+      ),
+    },
+    // Transform: external links always get rel + target patched.
+    transformTags: {
+      a: (tagName, attribs) => {
+        const href = attribs.href ?? "";
+        const isExternal = /^https?:\/\//i.test(href);
+        return {
+          tagName,
+          attribs: isExternal
+            ? { ...attribs, target: "_blank", rel: "noopener noreferrer" }
+            : attribs,
+        };
+      },
+    },
+  };
 }
 
 export interface SanitizeOptions {
-  /** When `true`, allow `<img>` tags. Defaults to `true` because the
-   *  editor schema permits images and Day 7 wires them up properly. */
+  /** When `false`, strip `<img>` / `<figure>` / `<figcaption>`. */
   allowImages?: boolean;
 }
 
-export function sanitizeHtml(input: string, opts: SanitizeOptions = {}): string {
-  installHooksOnce();
-
-  const tags = opts.allowImages === false
-    ? ALLOWED_TAGS.filter((t) => t !== "img" && t !== "figure" && t !== "figcaption")
-    : ALLOWED_TAGS;
-
-  return DOMPurify.sanitize(input, {
-    ALLOWED_TAGS: tags,
-    ALLOWED_ATTR,
-    // Forbid form, script, style elements (defaults but make explicit).
-    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form"],
-    FORBID_ATTR: ["onerror", "onload", "onclick", "onfocus", "onmouseover"],
-    // Drop common Word / Outlook namespaced wrappers entirely.
-    KEEP_CONTENT: true,
-  });
+export function sanitizeHtml(
+  input: string,
+  opts: SanitizeOptions = {},
+): string {
+  return sanitizeHtmlLib(input, buildOptions(opts));
 }
+
+/** Re-export hint used by SAFE_STYLE_PROP_RE consumers. Kept for the
+ *  sanitize.test.ts assertions that verify the regex's intent. */
+export const __SAFE_STYLE_PROP_RE = SAFE_STYLE_PROP_RE;

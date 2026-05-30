@@ -26,6 +26,7 @@ export interface ArticleStatusActionsLabels {
   unpublish: string;
   archive: string;
   unarchive: string;
+  confirmPublish: string;
   confirmUnpublish: string;
   confirmArchivePublished: string;
   errors: {
@@ -43,6 +44,10 @@ interface Props {
   /** Current DB status as a string — accepted as either domain or
    *  Prisma enum since the schemas overlap 1-to-1. */
   status: ArticleState | string;
+  /** Used for the post-publish redirect into the public article page. */
+  slug: string;
+  /** Current UI locale (en / zh-CN / zh-HK) — also for the redirect. */
+  locale: string;
   labels: ArticleStatusActionsLabels;
 }
 
@@ -59,11 +64,16 @@ const EVENT_META: Record<
     >;
     confirmKey?: keyof Pick<
       ArticleStatusActionsLabels,
-      "confirmUnpublish" | "confirmArchivePublished"
+      "confirmPublish" | "confirmUnpublish" | "confirmArchivePublished"
     >;
   }
 > = {
-  publish: { icon: Send, tone: "primary", labelKey: "publish" },
+  publish: {
+    icon: Send,
+    tone: "primary",
+    labelKey: "publish",
+    confirmKey: "confirmPublish",
+  },
   unpublish: {
     icon: RotateCcw,
     tone: "secondary",
@@ -90,7 +100,13 @@ const TONE_CLASS: Record<"primary" | "secondary" | "danger", string> = {
     "border border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300 hover:bg-rose-500/15",
 };
 
-export function ArticleStatusActions({ articleId, status, labels }: Props) {
+export function ArticleStatusActions({
+  articleId,
+  status,
+  slug,
+  locale,
+  labels,
+}: Props) {
   const router = useRouter();
   const [busyEvent, setBusyEvent] = useState<ArticleEvent["type"] | null>(null);
   const [, startTransition] = useTransition();
@@ -114,9 +130,13 @@ export function ArticleStatusActions({ articleId, status, labels }: Props) {
   async function run(event: ArticleEvent["type"]) {
     const meta = EVENT_META[event];
     if (meta.confirmKey) {
-      // Only show the archive confirm when archiving a *published* row.
-      // Archiving a draft is fine without nag.
+      // - publish: always confirm (going live is the most consequential
+      //   transition; reader-visible)
+      // - unpublish: always confirm (pulls live content)
+      // - archive: only confirm when archiving a *published* row;
+      //   archiving a draft is harmless and shouldn't nag
       const needsConfirm =
+        event === "publish" ||
         event === "unpublish" ||
         (event === "archive" && status === "published");
       if (needsConfirm && !window.confirm(labels[meta.confirmKey])) {
@@ -148,6 +168,15 @@ export function ArticleStatusActions({ articleId, status, labels }: Props) {
           setError(labels.errors.internal);
       }
       setBusyEvent(null);
+      return;
+    }
+    // On publish, jump to the public article page so the editor can
+    // confirm the rendered result is what they expected. Other
+    // transitions stay on the edit page (refresh in place).
+    if (event === "publish") {
+      startTransition(() => {
+        router.push(`/${locale}/articles/${slug}`);
+      });
       return;
     }
     // Server revalidated /admin/articles/[id]/edit — refresh so the

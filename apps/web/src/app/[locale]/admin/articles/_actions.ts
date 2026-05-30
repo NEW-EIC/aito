@@ -731,3 +731,107 @@ export async function transitionArticleAction(
 
   return { ok: true, newStatus: next.state };
 }
+
+// ─── Create author (called from MetadataForm's author multi-select) ─────
+
+const CreateAuthorInput = z.object({
+  name: z.string().trim().min(1, { message: "nameRequired" }).max(120),
+});
+
+export type CreateAuthorInput = z.infer<typeof CreateAuthorInput>;
+
+export type CreateAuthorResult =
+  | { ok: true; author: { id: string; name: string; title: string | null } }
+  | {
+      ok: false;
+      code:
+        | "validation"
+        | "slugTaken"
+        | "permissionDenied"
+        | "notStaff"
+        | "internal";
+      message?: string;
+    };
+
+/** Slug from name: lowercase, ASCII alnum + dashes. Non-Latin authors
+ *  fall back to a stable random slug so the @unique constraint never
+ *  blocks a Chinese name. */
+function authorSlugFromName(name: string): string {
+  const ascii = name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  if (ascii.length > 0) return ascii;
+  // base36 random suffix when the name is pure CJK / non-Latin
+  const buf = new Uint8Array(4);
+  crypto.getRandomValues(buf);
+  const n = ((buf[0]! << 24) >>> 0) | (buf[1]! << 16) | (buf[2]! << 8) | buf[3]!;
+  return `author-${n.toString(36).padStart(6, "0").slice(0, 6)}`;
+}
+
+export async function createAuthorAction(
+  raw: unknown,
+): Promise<CreateAuthorResult> {
+  // content.draft is the right gate — editors who can draft articles
+  // can attach new authors. Avoids creating a separate permission key
+  // when no real use case demands stricter authorship management.
+  let actorId: string;
+  try {
+    const ctx = await requirePermission("content.draft");
+    actorId = ctx.userId;
+  } catch (err) {
+    if (err instanceof StaffAuthError) {
+      return {
+        ok: false,
+        code: err.code === "not_staff" ? "notStaff" : "permissionDenied",
+        message: err.message,
+      };
+    }
+    throw err;
+  }
+
+  const parsed = CreateAuthorInput.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, code: "validation" };
+  }
+  const { name } = parsed.data;
+  let slug = authorSlugFromName(name);
+
+  // Slug collision retry with a counter suffix — happens when two editors
+  // create authors with the same Latin name. After 5 collisions just
+  // pile on a longer random suffix.
+  for (let i = 0; i < 5; i++) {
+    const existing = await prisma.author.findUnique({ where: { slug } });
+    if (!existing) break;
+    slug = `${slug}-${i + 2}`;
+  }
+
+  try {
+    const author = await prisma.author.create({
+      data: { slug, name },
+      select: { id: true, name: true, title: true },
+    });
+
+    await recordAuditLog({
+      action: "article.created", // closest existing AdminAction; Day 9
+      actorId,                    // audit-vocab cleanup will add author.created.
+      resourceType: "author",
+      resourceId: author.id,
+      newValue: { slug, name },
+      metadata: { source: "createAuthorAction" },
+    });
+
+    return { ok: true, author };
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
+      return { ok: false, code: "slugTaken" };
+    }
+    throw err;
+  }
+}

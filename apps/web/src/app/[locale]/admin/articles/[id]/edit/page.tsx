@@ -138,11 +138,14 @@ export default async function EditArticlePage({
         <ArticleStatusActions
           articleId={article.id}
           status={article.status}
+          slug={article.slug}
+          locale={locale}
           labels={{
             publish: tActions("publish"),
             unpublish: tActions("unpublish"),
             archive: tActions("archive"),
             unarchive: tActions("unarchive"),
+            confirmPublish: tActions("confirmPublish"),
             confirmUnpublish: tActions("confirmUnpublish"),
             confirmArchivePublished: tActions("confirmArchivePublished"),
             errors: {
@@ -206,6 +209,7 @@ export default async function EditArticlePage({
               categoryNone: tForm("categoryNone"),
               authors: tForm("authors"),
               authorsEmpty: tForm("authorsEmpty"),
+              authorsCreateNew: tForm("authorsCreateNew"),
               tags: tForm("tags"),
               tagsEmpty: tForm("tagsEmpty"),
               heroImageUrl: tForm("heroImageUrl"),

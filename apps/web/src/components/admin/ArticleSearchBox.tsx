@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "@/i18n/routing";
+import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
 interface Props {
@@ -9,12 +9,18 @@ interface Props {
   placeholder: string;
   /** Preserved across searches so switching tabs + searching are independent. */
   activeFilter: "all" | "draft" | "published" | "archived" | "other";
+  /** Locale prefix the page is currently rendered under, used to build the
+   *  pushed URL. We use next/navigation (not next-intl's router) because
+   *  next-intl's router strips/rewrites query strings during locale
+   *  prefixing in some cases; a plain absolute path push is reliable. */
+  locale: string;
 }
 
 export function ArticleSearchBox({
   initialValue,
   placeholder,
   activeFilter,
+  locale,
 }: Props) {
   const router = useRouter();
   const [value, setValue] = useState(initialValue);
@@ -25,9 +31,8 @@ export function ArticleSearchBox({
     if (activeFilter !== "all") qs.set("status", activeFilter);
     const trimmed = next.trim();
     if (trimmed) qs.set("q", trimmed);
-    const target = qs.toString()
-      ? `/admin/articles?${qs}`
-      : "/admin/articles";
+    const basePath = `/${locale}/admin/articles`;
+    const target = qs.toString() ? `${basePath}?${qs}` : basePath;
     startTransition(() => router.push(target));
   }
 

@@ -1006,6 +1006,15 @@
     "bridge": "我们认为下一个十年的投资需要用两种语言读两个市场,且用同一套标准。美股有可信的英语财经媒体;大中华有可信的中文财经媒体;但目前没有一支编辑部由同一拨人,用同一套标准,为认真的读者两边都写。我们要做那一支。",
     "contact": "媒体、招聘与合作:hello@aito.io"
   },
+  "articleIndex": {
+    "heading": "文章",
+    "subheading": "AITO 编辑部已发布的全部稿件。",
+    "empty": "暂无已发布的文章。",
+    "by": "作者:",
+    "prev": "上一页",
+    "next": "下一页",
+    "paginationCount": "第 {page} 页 / 共 {total} 页"
+  },
   "admin": {
     "appName": "AITO",
     "backToSite": "返回站点",
@@ -1081,7 +1090,7 @@
         "title": "暂用标题",
         "titleHelp": "稍后可改,用于自动建议下方的 URL 字段。",
         "slug": "URL 标识",
-        "slugHelp": "仅小写字母、数字与连字符。最终路径为 /articles/<slug>。",
+        "slugHelp": "仅小写字母、数字与连字符。最终路径为 /articles/ 之后那一段。",
         "slugAutoNote": "(根据标题自动建议,可点击修改)",
         "submit": "创建草稿",
         "submitting": "创建中…",
@@ -1109,6 +1118,7 @@
           "unpublish": "取消发布",
           "archive": "归档",
           "unarchive": "取消归档",
+          "confirmPublish": "立即发布?读者将按所属档位看到全文。",
           "confirmUnpublish": "把这篇文章从公众视图中下线?之后可随时重新发布。",
           "confirmArchivePublished": "归档已发布的文章?读者将看不到。",
           "errors": {
@@ -1118,7 +1128,7 @@
         },
         "form": {
           "slug": "URL 标识",
-          "slugHelp": "仅小写字母、数字与连字符。最终路径为 /articles/<slug>。",
+          "slugHelp": "仅小写字母、数字与连字符。最终路径为 /articles/ 之后那一段。",
           "kind": "类型",
           "kindOptions": {
             "newsletter": "通讯",
@@ -1144,6 +1154,7 @@
           "categoryNone": "(无)",
           "authors": "作者",
           "authorsEmpty": "尚未指定作者 — 发布前至少添加一位。",
+          "authorsCreateNew": "新建作者",
           "tags": "标签",
           "tagsEmpty": "尚无标签。",
           "heroImageUrl": "封面图 URL",
@@ -1209,8 +1220,8 @@
             "copied": "已复制"
           },
           "stats": {
-            "words": "{n} 字",
-            "readingTime": "约 {n} 分钟阅读"
+            "words": "%count% 字",
+            "readingTime": "约 %count% 分钟阅读"
           },
           "picker": {
             "heading": "语言",

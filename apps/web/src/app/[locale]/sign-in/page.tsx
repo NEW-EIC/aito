@@ -18,8 +18,11 @@ export default async function SignInPage({
   const { redirectTo: rawRedirectTo } = await searchParams;
   setRequestLocale(locale);
 
-  // Locale-less path is what next-intl's client-side router expects (SignInForm).
-  // For the server-side `redirect()` below, we need the locale-prefixed form.
+  // sanitize always returns a string (defaults to /dashboard if missing).
+  // We pass the *unsanitised* original into the form so it can tell
+  // "user explicitly asked for /dashboard" from "user didn't specify"
+  // and route staff to /admin by default. The server-side redirect for
+  // already-signed-in users still uses the sanitised version.
   const safeRedirectTo = sanitizeRedirectTo(rawRedirectTo);
 
   // Already signed in? Go straight through.
@@ -42,7 +45,10 @@ export default async function SignInPage({
       }
     >
       <SocialSignInButtons />
-      <SignInForm redirectTo={safeRedirectTo} />
+      <SignInForm
+        redirectTo={safeRedirectTo}
+        explicitRedirect={!!rawRedirectTo}
+      />
     </AuthCard>
   );
 }

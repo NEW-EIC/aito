@@ -1006,6 +1006,15 @@
     "bridge": "We think the next decade of investing requires reading two markets in two languages, with the same standards. There is a credible English-language press for US markets. There is a credible Mandarin-language press for Greater China. There is no editorial house yet writing both, by the same editors, for serious readers. We're building that.",
     "contact": "Press, hiring, and partnerships: hello@aito.io"
   },
+  "articleIndex": {
+    "heading": "Articles",
+    "subheading": "Every published piece from the AITO desk.",
+    "empty": "No articles published yet.",
+    "by": "By",
+    "prev": "Previous",
+    "next": "Next",
+    "paginationCount": "Page {page} of {total}"
+  },
   "admin": {
     "appName": "AITO",
     "backToSite": "Back to site",
@@ -1081,7 +1090,7 @@
         "title": "Working title",
         "titleHelp": "Editable later. Used to suggest the URL slug below.",
         "slug": "URL slug",
-        "slugHelp": "Lowercase letters, numbers, and dashes only. Becomes /articles/<slug>.",
+        "slugHelp": "Lowercase letters, numbers, and dashes only. Becomes the URL after /articles/.",
         "slugAutoNote": "(auto-suggested from title — click to edit)",
         "submit": "Create draft",
         "submitting": "Creating…",
@@ -1109,6 +1118,7 @@
           "unpublish": "Unpublish",
           "archive": "Archive",
           "unarchive": "Unarchive",
+          "confirmPublish": "Publish this article now? It becomes visible to readers at the matching plan tier.",
           "confirmUnpublish": "Pull this article from public view? You can republish at any time.",
           "confirmArchivePublished": "Archive this published article? Readers will no longer see it.",
           "errors": {
@@ -1118,7 +1128,7 @@
         },
         "form": {
           "slug": "URL slug",
-          "slugHelp": "Lowercase letters, numbers, and dashes only. Becomes /articles/<slug>.",
+          "slugHelp": "Lowercase letters, numbers, and dashes only. Becomes the URL after /articles/.",
           "kind": "Kind",
           "kindOptions": {
             "newsletter": "Newsletter",
@@ -1144,6 +1154,7 @@
           "categoryNone": "(none)",
           "authors": "Authors",
           "authorsEmpty": "No author yet — add at least one before publishing.",
+          "authorsCreateNew": "Create new author",
           "tags": "Tags",
           "tagsEmpty": "No tags yet.",
           "heroImageUrl": "Hero image URL",
@@ -1209,8 +1220,8 @@
             "copied": "Copied"
           },
           "stats": {
-            "words": "{n} words",
-            "readingTime": "~{n} min read"
+            "words": "%count% words",
+            "readingTime": "~%count% min read"
           },
           "picker": {
             "heading": "Language",

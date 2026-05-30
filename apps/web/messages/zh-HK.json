@@ -1006,6 +1006,15 @@
     "bridge": "我們認為下一個十年的投資需要用兩種語言讀兩個市場,且用同一套標準。美股有可信的英語財經媒體;大中華有可信的中文財經媒體;但目前還沒有一支編輯部由同一批人,用同一套標準,為認真的讀者兩邊都寫。我們要做那一支。",
     "contact": "傳媒、招聘與合作:hello@aito.io"
   },
+  "articleIndex": {
+    "heading": "文章",
+    "subheading": "AITO 編輯部已發佈嘅全部稿件。",
+    "empty": "暫無已發佈嘅文章。",
+    "by": "作者:",
+    "prev": "上一頁",
+    "next": "下一頁",
+    "paginationCount": "第 {page} 頁 / 共 {total} 頁"
+  },
   "admin": {
     "appName": "AITO",
     "backToSite": "返回站台",
@@ -1081,7 +1090,7 @@
         "title": "暫用標題",
         "titleHelp": "之後可改,用嚟自動建議下面嘅 URL 欄位。",
         "slug": "URL 標識",
-        "slugHelp": "只接受細寫字母、數字同連字符。最後路徑係 /articles/<slug>。",
+        "slugHelp": "只接受細寫字母、數字同連字符。最後路徑係 /articles/ 之後嗰段。",
         "slugAutoNote": "(根據標題自動建議,撳一下就可以改)",
         "submit": "新增草稿",
         "submitting": "建立中…",
@@ -1109,6 +1118,7 @@
           "unpublish": "取消發佈",
           "archive": "歸檔",
           "unarchive": "解除歸檔",
+          "confirmPublish": "即刻發佈?讀者會按所屬檔位睇到全文。",
           "confirmUnpublish": "將呢篇文章由公眾視圖下線?之後隨時可以重新發佈。",
           "confirmArchivePublished": "歸檔呢篇已發佈嘅文章?讀者將會見唔到。",
           "errors": {
@@ -1118,7 +1128,7 @@
         },
         "form": {
           "slug": "URL 標識",
-          "slugHelp": "只接受細寫字母、數字同連字符。最後路徑係 /articles/<slug>。",
+          "slugHelp": "只接受細寫字母、數字同連字符。最後路徑係 /articles/ 之後嗰段。",
           "kind": "類型",
           "kindOptions": {
             "newsletter": "通訊",
@@ -1144,6 +1154,7 @@
           "categoryNone": "(無)",
           "authors": "作者",
           "authorsEmpty": "未有指定作者 — 發佈前至少加一位。",
+          "authorsCreateNew": "新增作者",
           "tags": "標籤",
           "tagsEmpty": "未有標籤。",
           "heroImageUrl": "封面圖 URL",
@@ -1209,8 +1220,8 @@
             "copied": "已複製"
           },
           "stats": {
-            "words": "{n} 字",
-            "readingTime": "約 {n} 分鐘閱讀"
+            "words": "%count% 字",
+            "readingTime": "約 %count% 分鐘閱讀"
           },
           "picker": {
             "heading": "語言",

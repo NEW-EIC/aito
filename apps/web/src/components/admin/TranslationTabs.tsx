@@ -62,9 +62,10 @@ interface Labels {
     copied: string;
   };
   stats: {
-    /** "{n} words" or "{n} 字" depending on locale */
+    /** Uses literal "%count%" as the substitution token (not ICU,
+     *  because the value is interpolated client-side after the server
+     *  has already passed the rendered string through next-intl). */
     words: string;
-    /** "~{n} min read" */
     readingTime: string;
   };
   save: string;
@@ -640,12 +641,12 @@ function TranslationEditor({
                 : labels.autosave.idle}
           </p>
           <p className="text-fg-soft tabular-nums-feature">
-            {labels.stats.words.replace("{n}", String(wordStats.totalUnits))}
+            {labels.stats.words.replace("%count%", String(wordStats.totalUnits))}
             {wordStats.readingMinutes > 0 && (
               <>
                 {" · "}
                 {labels.stats.readingTime.replace(
-                  "{n}",
+                  "%count%",
                   String(wordStats.readingMinutes),
                 )}
               </>

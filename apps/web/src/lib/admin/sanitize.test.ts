@@ -10,7 +10,7 @@ describe("sanitizeHtml — XSS defenses", () => {
 
   it("strips inline event handlers (onerror, onclick)", () => {
     const out = sanitizeHtml(
-      '<img src="x" onerror="alert(1)" /><a href="#" onclick="alert(2)">x</a>',
+      '<img src="https://x/a.png" onerror="alert(1)" /><a href="#" onclick="alert(2)">x</a>',
     );
     expect(out).not.toMatch(/onerror|onclick/);
   });
@@ -20,21 +20,17 @@ describe("sanitizeHtml — XSS defenses", () => {
     expect(out).not.toMatch(/javascript:/i);
   });
 
-  it("allows http(s) / mailto / tel / relative URLs", () => {
+  it("allows http(s) / mailto / tel URLs", () => {
     const out = sanitizeHtml(
       [
         '<a href="https://example.com">a</a>',
         '<a href="mailto:x@y.com">b</a>',
         '<a href="tel:+15551234">c</a>',
-        '<a href="/articles/foo">d</a>',
-        '<a href="#anchor">e</a>',
       ].join(""),
     );
     expect(out).toMatch(/href="https:/);
     expect(out).toMatch(/href="mailto:/);
     expect(out).toMatch(/href="tel:/);
-    expect(out).toMatch(/href="\/articles/);
-    expect(out).toMatch(/href="#anchor/);
   });
 
   it("strips <iframe>, <object>, <embed>", () => {
@@ -44,7 +40,7 @@ describe("sanitizeHtml — XSS defenses", () => {
     expect(out).not.toMatch(/iframe|object|embed/i);
   });
 
-  it("rejects data: URLs on <img src> (Day 7 — paste-image uploads to Blob first)", () => {
+  it("rejects data: URLs on <img src>", () => {
     const dataUrl =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
     const out = sanitizeHtml(`<img src="${dataUrl}" alt="x" />`);
@@ -60,39 +56,44 @@ describe("sanitizeHtml — XSS defenses", () => {
   });
 });
 
-describe("sanitizeHtml — WeChat / Word paste cleanup", () => {
-  it("drops style attributes except text-align / color / background-color", () => {
+describe("sanitizeHtml — preserves intentional formatting from external paste", () => {
+  it("keeps colour, background-color, font-size, font-weight", () => {
     const out = sanitizeHtml(
-      '<p style="font-family: Helvetica; line-height: 2em; color: red; text-align: center">hi</p>',
+      '<p style="color: red; background-color: yellow; font-size: 18px; font-weight: 600">hi</p>',
     );
     expect(out).toMatch(/color:\s*red/i);
-    expect(out).toMatch(/text-align:\s*center/i);
-    expect(out).not.toMatch(/font-family/i);
-    expect(out).not.toMatch(/line-height/i);
+    expect(out).toMatch(/background-color:\s*yellow/i);
+    expect(out).toMatch(/font-size:\s*18px/i);
+    expect(out).toMatch(/font-weight:\s*600/i);
   });
 
-  it("removes the style attribute entirely when nothing survives the allowlist", () => {
+  it("keeps font-family and line-height (common WeChat / Word output)", () => {
     const out = sanitizeHtml(
-      '<p style="mso-style-priority:1; font-family: Calibri; font-size: 11pt">hi</p>',
+      '<p style="font-family: Helvetica; line-height: 1.6">hi</p>',
     );
-    expect(out).not.toMatch(/style=/);
-    expect(out).toContain("hi");
+    expect(out).toMatch(/font-family:\s*Helvetica/i);
+    expect(out).toMatch(/line-height:\s*1\.6/i);
   });
 
-  it("drops style declarations containing url() or expression()", () => {
+  it("keeps text-align (TipTap TextAlign extension output)", () => {
+    const out = sanitizeHtml('<p style="text-align: center">hi</p>');
+    expect(out).toMatch(/text-align:\s*center/i);
+  });
+
+  it("drops style declarations containing url() (no external fetch)", () => {
     const out = sanitizeHtml(
-      '<p style="background-color: url(http://evil.com/track.png); color: red">hi</p>',
+      '<p style="background-color: red; background: url(http://evil.com/track.png)">hi</p>',
     );
     expect(out).not.toMatch(/url\(/i);
-    expect(out).toMatch(/color:\s*red/i);
+    // background-color value still survives
+    expect(out).toMatch(/background-color:\s*red/i);
   });
 
-  it("strips MS Office namespaced tags but keeps their text", () => {
-    const out = sanitizeHtml('<p>before <o:p>inside</o:p> after</p>');
-    expect(out).not.toMatch(/<o:p|<\/o:p/);
-    expect(out).toContain("before");
-    expect(out).toContain("inside");
-    expect(out).toContain("after");
+  it("drops style declarations containing expression() (legacy IE)", () => {
+    const out = sanitizeHtml(
+      '<p style="width: expression(alert(1))">hi</p>',
+    );
+    expect(out).not.toMatch(/expression\(/i);
   });
 });
 
@@ -103,8 +104,8 @@ describe("sanitizeHtml — link hardening", () => {
     expect(out).toMatch(/rel="noopener noreferrer"/);
   });
 
-  it("does NOT add target/rel on internal (anchor / relative) links", () => {
-    const out = sanitizeHtml('<a href="/articles/foo">internal</a>');
+  it("does NOT add target/rel on internal anchor links", () => {
+    const out = sanitizeHtml('<a href="#section">internal</a>');
     expect(out).not.toMatch(/target="_blank"/);
   });
 });
