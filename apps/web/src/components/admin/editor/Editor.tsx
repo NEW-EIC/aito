@@ -8,11 +8,12 @@ import { Color } from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Toolbar } from "./Toolbar";
 import { sanitizeHtml } from "@/lib/admin/sanitize";
 import { uploadImageFile } from "./uploadImage";
 import { useToasts, ToastView } from "../Toast";
+import { ImageCropDialog, type ImageCropDialogLabels } from "./ImageCropDialog";
 
 interface Props {
   /** Initial HTML to load. Subsequent updates to this prop reset the editor
@@ -26,6 +27,8 @@ interface Props {
   disabled?: boolean;
   /** Forwarded to the toolbar so labels match the surrounding admin UI. */
   toolbarLabels: Parameters<typeof Toolbar>[0]["labels"];
+  /** Labels for the crop-image dialog shown before each upload. */
+  cropDialogLabels: ImageCropDialogLabels;
 }
 
 export function Editor({
@@ -34,6 +37,7 @@ export function Editor({
   placeholder,
   disabled,
   toolbarLabels,
+  cropDialogLabels,
 }: Props) {
   // useRef holds the latest onChange so we don't have to add it to the
   // extensions array (which would re-init the editor on every render and
@@ -52,6 +56,28 @@ export function Editor({
   // a blocking window.alert(). Scoped to this Editor instance.
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
 
+  // Crop dialog state. When `cropFile` is non-null the modal is open;
+  // `cropResolverRef` holds the resolver from the promise that
+  // `openCropDialog` returned, so the modal's callbacks can fulfil it.
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const cropResolverRef = useRef<((file: File | null) => void) | null>(null);
+
+  /** Opens the crop dialog on `file` and resolves with the file the
+   *  user picked (cropped or original), or null if they cancelled. */
+  function openCropDialog(file: File): Promise<File | null> {
+    return new Promise<File | null>((resolve) => {
+      cropResolverRef.current = resolve;
+      setCropFile(file);
+    });
+  }
+
+  function resolveCrop(result: File | null): void {
+    const resolver = cropResolverRef.current;
+    cropResolverRef.current = null;
+    setCropFile(null);
+    resolver?.(result);
+  }
+
   async function insertImageAtPosition(
     file: File,
     pos: number | null,
@@ -59,24 +85,24 @@ export function Editor({
     const ed = editorRef.current;
     if (!ed) return;
 
-    // Simpler flow than the earlier optimistic-placeholder one: show a
-    // toast for the in-flight upload, await it, insert the real URL on
-    // success. Trades immediate "image lands" feedback for two things:
-    //   1. ResizableNodeView wraps each image — a 1×1 GIF placeholder
-    //      sized the wrapper to 1×1 px so editors saw nothing happen.
-    //   2. The previous flow inserted a data: URL into the doc; if
-    //      autosave fired during upload that data URL went to the DB,
-    //      and the public renderer's sanitiser strips data: URLs
-    //      → broken image on the public site until the next save.
-    // Synchronous insert with the real URL avoids both.
+    // Step 1 — let the editor crop (or skip) before we upload. SVG /
+    // GIF go straight through because the canvas-based crop can't
+    // round-trip them losslessly; in practice we lose animation /
+    // vector content otherwise.
+    const skipCrop = file.type === "image/svg+xml" || file.type === "image/gif";
+    const finalFile = skipCrop ? file : await openCropDialog(file);
+    if (!finalFile) return; // cancelled
+
+    // Step 2 — upload. Show a sticky in-flight toast so a slow upload
+    // doesn't feel like the app lost the drop.
     const uploadingToastId = pushToast(
       "info",
       "Uploading image…",
-      file.name,
+      finalFile.name,
       { sticky: true },
     );
 
-    const result = await uploadImageFile(file);
+    const result = await uploadImageFile(finalFile);
 
     // Dismiss the in-flight toast either way.
     dismissToast(uploadingToastId);
@@ -97,7 +123,7 @@ export function Editor({
         type: "image",
         attrs: {
           src: result.url,
-          alt: file.name.replace(/\.[a-z0-9]+$/i, ""),
+          alt: finalFile.name.replace(/\.[a-z0-9]+$/i, ""),
         },
       })
       .run();
@@ -267,6 +293,11 @@ export function Editor({
         <EditorContent editor={editor} />
       </div>
       <ToastView toasts={toasts} dismiss={dismissToast} />
+      <ImageCropDialog
+        file={cropFile}
+        labels={cropDialogLabels}
+        onResolve={resolveCrop}
+      />
     </>
   );
 }

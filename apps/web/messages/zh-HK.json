@@ -1221,6 +1221,14 @@
           "linkPrompt": "連結 URL",
           "image": "上載圖片"
         },
+        "cropDialog": {
+          "title": "裁剪圖片",
+          "description": "拖動四角調整裁剪框。點擊「使用原圖」可跳過裁剪。",
+          "applyCrop": "套用裁剪",
+          "useOriginal": "使用原圖",
+          "cancel": "取消",
+          "processing": "處理中…"
+        },
         "translations": {
           "addTranslation": "新增翻譯",
           "version": "版本",

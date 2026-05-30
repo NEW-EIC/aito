@@ -76,6 +76,7 @@ export default async function EditArticlePage({
   const tForm = await getTranslations("admin.articles.edit.form");
   const tTabs = await getTranslations("admin.articles.edit.translations");
   const tToolbar = await getTranslations("admin.articles.edit.toolbar");
+  const tCrop = await getTranslations("admin.articles.edit.cropDialog");
   const tActions = await getTranslations("admin.articles.edit.actions");
   const tArticles = await getTranslations("admin.articles");
 
@@ -308,6 +309,14 @@ export default async function EditArticlePage({
                 codeBlock: tToolbar("codeBlock"),
                 linkPrompt: tToolbar("linkPrompt"),
                 image: tToolbar("image"),
+              },
+              cropDialog: {
+                title: tCrop("title"),
+                description: tCrop("description"),
+                applyCrop: tCrop("applyCrop"),
+                useOriginal: tCrop("useOriginal"),
+                cancel: tCrop("cancel"),
+                processing: tCrop("processing"),
               },
               autosave: {
                 idle: tTabs("autosave.idle"),

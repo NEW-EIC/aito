@@ -12,6 +12,7 @@ import {
 import { SaveIndicator } from "./SaveIndicator";
 import { Editor } from "./editor/Editor";
 import type { ToolbarLabels } from "./editor/Toolbar";
+import type { ImageCropDialogLabels } from "./editor/ImageCropDialog";
 import { countWords } from "@/lib/admin/wordCount";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -51,6 +52,7 @@ interface Labels {
     seoDescriptionHelp: string;
   };
   toolbar: ToolbarLabels;
+  cropDialog: ImageCropDialogLabels;
   autosave: { idle: string; saving: string; failed: string };
   copyFromLocale: {
     trigger: string;
@@ -648,6 +650,7 @@ function TranslationEditor({
           onChange={setBody}
           placeholder={labels.fields.bodyPlaceholder}
           toolbarLabels={labels.toolbar}
+          cropDialogLabels={labels.cropDialog}
           disabled={busy}
         />
         <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-xs">

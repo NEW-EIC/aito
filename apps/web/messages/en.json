@@ -1221,6 +1221,14 @@
           "linkPrompt": "Link URL",
           "image": "Upload image"
         },
+        "cropDialog": {
+          "title": "Crop image",
+          "description": "Drag the corners to crop. Click \"Use original\" to skip.",
+          "applyCrop": "Apply crop",
+          "useOriginal": "Use original",
+          "cancel": "Cancel",
+          "processing": "Processing…"
+        },
         "translations": {
           "addTranslation": "Add translation",
           "version": "Version",
