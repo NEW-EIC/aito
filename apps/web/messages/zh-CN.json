@@ -2,6 +2,7 @@
   "locale": "zh-CN",
   "nav": {
     "shows": "栏目",
+    "articles": "文章",
     "pricing": "订阅方案",
     "live": "直播课",
     "community": "社群",
@@ -765,8 +766,17 @@
     "pagination": "第 1 页 / 共 34 页 · 412 期"
   },
   "dashboard": {
-    "greeting": "早上好,",
-    "reader": "Selina K.",
+    "greeting": "欢迎回来,",
+    "reader": "读者",
+    "browse": {
+      "title": "浏览编辑部",
+      "count": "{count, plural, =0 {还没有文章} other {已发布 # 篇文章}}"
+    },
+    "recent": {
+      "title": "编辑部最新",
+      "sub": "最近发布的稿件。",
+      "empty": "暂无已发布的文章。"
+    },
     "nav": [
       "总览",
       "阅读",
@@ -1005,5 +1015,272 @@
     "bridgeTitle": "为什么做一座太平洋上的桥。",
     "bridge": "我们认为下一个十年的投资需要用两种语言读两个市场,且用同一套标准。美股有可信的英语财经媒体;大中华有可信的中文财经媒体;但目前没有一支编辑部由同一拨人,用同一套标准,为认真的读者两边都写。我们要做那一支。",
     "contact": "媒体、招聘与合作:hello@aito.io"
+  },
+  "articleIndex": {
+    "heading": "文章",
+    "subheading": "AITO 编辑部已发布的全部稿件。",
+    "empty": "暂无已发布的文章。",
+    "by": "作者:",
+    "prev": "上一页",
+    "next": "下一页",
+    "paginationCount": "第 {page} 页 / 共 {total} 页"
+  },
+  "admin": {
+    "appName": "AITO",
+    "backToSite": "返回站点",
+    "signedInAs": "当前登录",
+    "comingSoon": "敬请期待",
+    "backToDashboard": "返回控制台",
+    "nav": {
+      "dashboard": "控制台",
+      "articles": "文章",
+      "reviews": "审核",
+      "users": "用户",
+      "settings": "设置"
+    },
+    "dashboard": {
+      "heading": "编辑部后台",
+      "subheading": "创建文章、管理翻译、发布。使用左侧导航或下方入口。"
+    },
+    "tiles": {
+      "articles": "文章",
+      "articlesDesc": "查看草稿与已发布稿件,创建新文章。",
+      "reviews": "审核队列",
+      "reviewsDesc": "等待编辑审核的文章。通过或返回修改意见。",
+      "users": "用户",
+      "usersDesc": "查询读者与编辑,查看订阅状态。",
+      "settings": "设置",
+      "settingsDesc": "平台级开关。合规、试用期、功能标志。"
+    },
+    "placeholders": {
+      "articles": "文章列表将在 Phase A 第 3 天上线。目前可使用即将上线的新建表单开始草稿。",
+      "reviews": "编辑审核流程在 Phase B 实现。现阶段编辑直接从草稿点击发布。",
+      "users": "用户只读视图在 Phase B 实现。现阶段以 Prisma Studio 为准。",
+      "settings": "设置界面在 Phase B 实现。现阶段在 Prisma Studio 修改 PlatformSetting 行。"
+    },
+    "articles": {
+      "heading": "文章",
+      "subheading": "所有草稿、已发布与归档的稿件。点击条目进入编辑。",
+      "localeNames": {
+        "en": "英文",
+        "zh-CN": "简体中文",
+        "zh-HK": "繁体中文(香港)"
+      },
+      "newArticle": "新建文章",
+      "searchPlaceholder": "按标题搜索…",
+      "untitled": "(无标题)",
+      "updatedAt": "更新于",
+      "empty": "暂无文章。从新建草稿开始。",
+      "emptyWithSearch": "没有标题包含 \"{q}\" 的文章。",
+      "prev": "上一页",
+      "next": "下一页",
+      "paginationCount": "{from}–{to} 条,共 {total} 条",
+      "tabs": {
+        "all": "全部",
+        "draft": "草稿",
+        "published": "已发布",
+        "archived": "已归档",
+        "other": "其他"
+      },
+      "status": {
+        "draft": "草稿",
+        "in_review": "审核中",
+        "legal_review": "法务审核",
+        "scheduled": "已排期",
+        "published": "已发布",
+        "archived": "已归档"
+      },
+      "new": {
+        "backToList": "返回文章列表",
+        "heading": "新建文章",
+        "subheading": "选择类型、起始语言与暂用标题。其余字段在下一页继续完善。",
+        "kind": "类型",
+        "kindOptions": {
+          "newsletter": "通讯",
+          "podcast": "播客",
+          "blog": "博客文章"
+        },
+        "locale": "起始语言",
+        "localeHelp": "可在编辑器内添加其他语言。读者站点会按访客语言优雅回退。",
+        "title": "暂用标题",
+        "titleHelp": "稍后可改,用于自动建议下方的 URL 字段。",
+        "slug": "URL 标识",
+        "slugHelp": "仅小写字母、数字与连字符。最终路径为 /articles/ 之后那一段。",
+        "slugAutoNote": "(根据标题自动建议,可点击修改)",
+        "submit": "创建草稿",
+        "submitting": "创建中…",
+        "errors": {
+          "validation": "请检查高亮的字段。",
+          "titleRequired": "请填写标题。",
+          "slugInvalid": "标识只能包含小写字母、数字与连字符。",
+          "slugTaken": "该标识已被占用,请换一个。",
+          "permissionDenied": "你的角色不包含起草文章权限。请联系管理员。",
+          "notStaff": "需要使用编辑账户登录后才能新建文章。",
+          "internal": "服务端出错,请稍后重试。"
+        }
+      },
+      "edit": {
+        "backToList": "返回文章列表",
+        "untitled": "(无标题)",
+        "metadataHeading": "文章元数据",
+        "metadataSub": "URL 标识、付费档位、分类、作者、标签与合规分级。SEO 覆盖项在下方按翻译单独设置。",
+        "translationsHeading": "多语言版本",
+        "translationsSub": "至少需要一种语言。当访客的语言版本缺失时,公众站点会优雅回退到已有的语言。",
+        "preview": "预览",
+        "previewTitle": "在新标签页打开公众文章页。草稿会带上 ?preview=1,编辑可见。",
+        "actions": {
+          "publish": "发布",
+          "unpublish": "取消发布",
+          "archive": "归档",
+          "unarchive": "取消归档",
+          "confirmTitle": {
+            "publish": "确认发布?",
+            "unpublish": "确认取消发布?",
+            "archive": "确认归档?"
+          },
+          "confirmPublish": "立即发布?读者将按所属档位看到全文。",
+          "confirmUnpublish": "把这篇文章从公众视图中下线?之后可随时重新发布。",
+          "confirmArchivePublished": "归档已发布的文章?读者将看不到。",
+          "confirmYes": "确认",
+          "confirmNo": "取消",
+          "errors": {
+            "illegal": "当前状态不允许该操作。",
+            "missingTranslation": "发布前请至少添加一种语言的翻译。"
+          }
+        },
+        "form": {
+          "slug": "URL 标识",
+          "slugHelp": "仅小写字母、数字与连字符。最终路径为 /articles/ 之后那一段。",
+          "kind": "类型",
+          "kindOptions": {
+            "newsletter": "通讯",
+            "podcast": "播客",
+            "blog": "博客文章"
+          },
+          "requiredTier": "所需档位",
+          "requiredTierHelp": "阅读全文所需的订阅档位。草稿在发布之前不受此限制。",
+          "tierOptions": {
+            "free": "免费(公开)",
+            "premium": "Premium",
+            "pro": "Pro Desk"
+          },
+          "complianceClass": "合规分级",
+          "complianceHelp": "决定本篇在编辑审核流程中的处理方式。",
+          "complianceOptions": {
+            "general_information": "一般信息",
+            "educational": "教育内容",
+            "market_commentary": "市场评论",
+            "specific_recommendation": "具体投资建议(触发法务审核)"
+          },
+          "category": "分类",
+          "categoryNone": "(无)",
+          "authors": "作者",
+          "authorsEmpty": "尚未指定作者 — 发布前至少添加一位。",
+          "authorsCreateNew": "新建作者",
+          "tags": "标签",
+          "tagsEmpty": "尚无标签。",
+          "heroImageUrl": "封面图 URL",
+          "heroImageHelp": "Phase A 仅支持 URL。上传图片功能将于第 7 天上线。",
+          "save": "保存元数据",
+          "saving": "保存中…",
+          "saved": "已保存",
+          "unsaved": "尚未保存",
+          "errors": {
+            "validation": "请检查高亮的字段。",
+            "slugRequired": "请填写 URL 标识。",
+            "slugInvalid": "URL 标识只能包含小写字母、数字与连字符。",
+            "slugTaken": "该标识已被占用。",
+            "notFound": "文章未找到,可能已在另一标签页被删除。",
+            "permissionDenied": "你的角色不包含编辑文章权限。",
+            "notStaff": "需要以编辑账户登录才能修改。",
+            "internal": "服务端出错,请稍后重试。"
+          }
+        },
+        "toolbar": {
+          "bold": "加粗",
+          "italic": "斜体",
+          "underline": "下划线",
+          "strike": "删除线",
+          "code": "行内代码",
+          "h2": "二级标题",
+          "h3": "三级标题",
+          "bulletList": "无序列表",
+          "orderedList": "有序列表",
+          "blockquote": "引用",
+          "divider": "分隔线",
+          "link": "链接",
+          "unlink": "移除链接",
+          "alignLeft": "左对齐",
+          "alignCenter": "居中",
+          "alignRight": "右对齐",
+          "color": "字体颜色",
+          "highlight": "背景高亮",
+          "undo": "撤销",
+          "redo": "重做",
+          "codeBlock": "代码块",
+          "linkPrompt": "链接 URL",
+          "image": "上传图片"
+        },
+        "cropDialog": {
+          "title": "裁剪图片",
+          "description": "拖动四角调整裁剪框。点击「使用原图」可跳过裁剪。",
+          "applyCrop": "应用裁剪",
+          "useOriginal": "使用原图",
+          "cancel": "取消",
+          "processing": "处理中…"
+        },
+        "translations": {
+          "addTranslation": "添加翻译",
+          "version": "版本",
+          "autosave": {
+            "idle": "已开启自动保存,停止输入 2 秒后自动保存。",
+            "saving": "保存中…",
+            "failed": "自动保存失败,请点击\"保存翻译\"重试。"
+          },
+          "copyFromLocale": {
+            "trigger": "从其他语言复制…",
+            "heading": "源语言",
+            "overwriteTitle": "覆盖当前草稿?",
+            "overwriteConfirm": "确定用所选语言的文本替换当前草稿吗?未保存的更改会丢失。",
+            "confirmYes": "替换",
+            "confirmNo": "取消"
+          },
+          "htmlSource": {
+            "open": "查看 HTML",
+            "title": "HTML 源码",
+            "close": "关闭",
+            "copy": "复制",
+            "copied": "已复制"
+          },
+          "stats": {
+            "words": "%count% 字",
+            "readingTime": "约 %count% 分钟阅读"
+          },
+          "picker": {
+            "heading": "语言",
+            "cancel": "取消",
+            "titlePlaceholder": "该语言的暂用标题",
+            "submit": "添加",
+            "submitting": "添加中…",
+            "allLocalesPresent": "已添加全部支持的语言。"
+          },
+          "fields": {
+            "title": "标题",
+            "subtitle": "副标题",
+            "excerpt": "摘要",
+            "body": "正文",
+            "bodyPlaceholder": "在此撰写正文。",
+            "seoTitle": "SEO 标题",
+            "seoTitleHelp": "留空时默认使用文章标题。",
+            "seoDescription": "SEO 描述",
+            "seoDescriptionHelp": "留空时默认使用摘要。"
+          },
+          "errors": {
+            "titleRequired": "请填写标题。",
+            "alreadyExists": "该语言已存在翻译。"
+          }
+        }
+      }
+    }
   }
 }

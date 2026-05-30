@@ -135,5 +135,19 @@ export async function POST(req: NextRequest) {
     whenIso: new Date(session.createdAt).toISOString(),
   }).catch(() => {});
 
-  return NextResponse.json({ ok: true });
+  // Tell the client whether this user holds any non-revoked, non-expired
+  // role grant. The SignInForm uses this to pick the default redirect
+  // (staff → /admin, everyone else → /dashboard) when the URL didn't
+  // carry an explicit redirectTo. We only need to know IF they have any
+  // role, not which one — the /admin layout enforces real permissions.
+  const now = new Date();
+  const grantCount = await prisma.userRole.count({
+    where: {
+      userId: user.id,
+      revokedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+  });
+
+  return NextResponse.json({ ok: true, isStaff: grantCount > 0 });
 }

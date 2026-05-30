@@ -12,7 +12,7 @@ export async function Header() {
   const session = await getSessionFromCookie();
 
   const nav = [
-    { href: "/", labelKey: "nav.shows" },
+    { href: "/articles", labelKey: "nav.articles" },
     { href: "/pricing", labelKey: "nav.pricing" },
     { href: "/live", labelKey: "nav.live" },
     { href: "/community", labelKey: "nav.community" },

@@ -2,6 +2,7 @@
   "locale": "en",
   "nav": {
     "shows": "Shows",
+    "articles": "Articles",
     "pricing": "Pricing",
     "live": "Live",
     "community": "Community",
@@ -765,8 +766,17 @@
     "pagination": "Page 1 of 34 · 412 issues"
   },
   "dashboard": {
-    "greeting": "Good morning,",
-    "reader": "Selina K.",
+    "greeting": "Welcome back,",
+    "reader": "Reader",
+    "browse": {
+      "title": "Read the desk",
+      "count": "{count, plural, =0 {No articles yet} =1 {1 article published} other {# articles published}}"
+    },
+    "recent": {
+      "title": "Latest from the desk",
+      "sub": "Newest published pieces.",
+      "empty": "No published articles yet."
+    },
     "nav": [
       "Overview",
       "Reading",
@@ -1005,5 +1015,272 @@
     "bridgeTitle": "Why a Pacific bridge.",
     "bridge": "We think the next decade of investing requires reading two markets in two languages, with the same standards. There is a credible English-language press for US markets. There is a credible Mandarin-language press for Greater China. There is no editorial house yet writing both, by the same editors, for serious readers. We're building that.",
     "contact": "Press, hiring, and partnerships: hello@aito.io"
+  },
+  "articleIndex": {
+    "heading": "Articles",
+    "subheading": "Every published piece from the AITO desk.",
+    "empty": "No articles published yet.",
+    "by": "By",
+    "prev": "Previous",
+    "next": "Next",
+    "paginationCount": "Page {page} of {total}"
+  },
+  "admin": {
+    "appName": "AITO",
+    "backToSite": "Back to site",
+    "signedInAs": "Signed in as",
+    "comingSoon": "Soon",
+    "backToDashboard": "Back to dashboard",
+    "nav": {
+      "dashboard": "Dashboard",
+      "articles": "Articles",
+      "reviews": "Reviews",
+      "users": "Users",
+      "settings": "Settings"
+    },
+    "dashboard": {
+      "heading": "Editorial admin",
+      "subheading": "Create articles, manage translations, publish. Use the left nav or the tiles below."
+    },
+    "tiles": {
+      "articles": "Articles",
+      "articlesDesc": "Browse drafts and published pieces. Create a new article.",
+      "reviews": "Reviews queue",
+      "reviewsDesc": "Articles waiting on editorial review. Approve or send back with notes.",
+      "users": "Users",
+      "usersDesc": "Look up readers and editors. Inspect subscription state.",
+      "settings": "Settings",
+      "settingsDesc": "Platform-wide toggles. Compliance, trial length, feature flags."
+    },
+    "placeholders": {
+      "articles": "Article list arrives on Day 3 of Phase A. For now use the upcoming create form to start a draft.",
+      "reviews": "Editorial review workflow is Phase B. For now editors hit Publish directly from a draft.",
+      "users": "Read-only user explorer is Phase B. For now Prisma Studio is the source of truth.",
+      "settings": "Settings UI is Phase B. For now PlatformSetting rows are edited via Prisma Studio."
+    },
+    "articles": {
+      "heading": "Articles",
+      "subheading": "All drafts, published pieces, and archived work. Click a row to edit.",
+      "localeNames": {
+        "en": "English",
+        "zh-CN": "Simplified Chinese",
+        "zh-HK": "Traditional Chinese (Hong Kong)"
+      },
+      "newArticle": "New article",
+      "searchPlaceholder": "Search by title…",
+      "untitled": "(untitled)",
+      "updatedAt": "Updated",
+      "empty": "No articles yet. Start a new draft to see it here.",
+      "emptyWithSearch": "No articles match \"{q}\".",
+      "prev": "Previous",
+      "next": "Next",
+      "paginationCount": "{from}–{to} of {total}",
+      "tabs": {
+        "all": "All",
+        "draft": "Drafts",
+        "published": "Published",
+        "archived": "Archived",
+        "other": "Other"
+      },
+      "status": {
+        "draft": "draft",
+        "in_review": "in review",
+        "legal_review": "legal review",
+        "scheduled": "scheduled",
+        "published": "published",
+        "archived": "archived"
+      },
+      "new": {
+        "backToList": "Back to articles",
+        "heading": "New article",
+        "subheading": "Pick a kind, a starting language, and a working title. You can fine-tune everything else on the next screen.",
+        "kind": "Kind",
+        "kindOptions": {
+          "newsletter": "Newsletter",
+          "podcast": "Podcast",
+          "blog": "Blog post"
+        },
+        "locale": "Starting language",
+        "localeHelp": "You can add other languages from the editor. Public site falls back gracefully when a visitor's locale is missing.",
+        "title": "Working title",
+        "titleHelp": "Editable later. Used to suggest the URL slug below.",
+        "slug": "URL slug",
+        "slugHelp": "Lowercase letters, numbers, and dashes only. Becomes the URL after /articles/.",
+        "slugAutoNote": "(auto-suggested from title — click to edit)",
+        "submit": "Create draft",
+        "submitting": "Creating…",
+        "errors": {
+          "validation": "Please check the highlighted fields.",
+          "titleRequired": "Title is required.",
+          "slugInvalid": "Slug must be lowercase letters, numbers, and dashes.",
+          "slugTaken": "This slug is already in use. Pick another.",
+          "permissionDenied": "Your role doesn't include drafting articles. Ask an admin for the editor role.",
+          "notStaff": "You need to be signed in as staff to create articles.",
+          "internal": "Something went wrong on our end. Try again in a moment."
+        }
+      },
+      "edit": {
+        "backToList": "Back to articles",
+        "untitled": "(untitled)",
+        "metadataHeading": "Article metadata",
+        "metadataSub": "Slug, plan tier, category, authors, tags, and compliance settings. SEO overrides live per-translation below.",
+        "translationsHeading": "Translations",
+        "translationsSub": "At least one language is required. The public site falls back to whichever locale is filled when a visitor's preference is missing.",
+        "preview": "Preview",
+        "previewTitle": "Open the public article page in a new tab. Drafts get ?preview=1 so staff can see them.",
+        "actions": {
+          "publish": "Publish",
+          "unpublish": "Unpublish",
+          "archive": "Archive",
+          "unarchive": "Unarchive",
+          "confirmTitle": {
+            "publish": "Publish article?",
+            "unpublish": "Unpublish article?",
+            "archive": "Archive article?"
+          },
+          "confirmPublish": "Publish this article now? It becomes visible to readers at the matching plan tier.",
+          "confirmUnpublish": "Pull this article from public view? You can republish at any time.",
+          "confirmArchivePublished": "Archive this published article? Readers will no longer see it.",
+          "confirmYes": "Confirm",
+          "confirmNo": "Cancel",
+          "errors": {
+            "illegal": "That transition isn't allowed from the current status.",
+            "missingTranslation": "Add at least one translation before publishing."
+          }
+        },
+        "form": {
+          "slug": "URL slug",
+          "slugHelp": "Lowercase letters, numbers, and dashes only. Becomes the URL after /articles/.",
+          "kind": "Kind",
+          "kindOptions": {
+            "newsletter": "Newsletter",
+            "podcast": "Podcast",
+            "blog": "Blog post"
+          },
+          "requiredTier": "Required tier",
+          "requiredTierHelp": "Plan tier needed to read the full body. Drafts ignore this until published.",
+          "tierOptions": {
+            "free": "Free (public)",
+            "premium": "Premium",
+            "pro": "Pro Desk"
+          },
+          "complianceClass": "Compliance class",
+          "complianceHelp": "Flags how this article should be treated by the editorial review pipeline.",
+          "complianceOptions": {
+            "general_information": "General information",
+            "educational": "Educational",
+            "market_commentary": "Market commentary",
+            "specific_recommendation": "Specific recommendation (triggers legal review)"
+          },
+          "category": "Category",
+          "categoryNone": "(none)",
+          "authors": "Authors",
+          "authorsEmpty": "No author yet — add at least one before publishing.",
+          "authorsCreateNew": "Create new author",
+          "tags": "Tags",
+          "tagsEmpty": "No tags yet.",
+          "heroImageUrl": "Hero image URL",
+          "heroImageHelp": "URL only for Phase A. Upload-from-disk arrives on Day 7.",
+          "save": "Save metadata",
+          "saving": "Saving…",
+          "saved": "Saved",
+          "unsaved": "Unsaved changes",
+          "errors": {
+            "validation": "Please check the highlighted fields.",
+            "slugRequired": "Slug is required.",
+            "slugInvalid": "Slug must be lowercase letters, numbers, and dashes.",
+            "slugTaken": "This slug is already in use.",
+            "notFound": "Article not found. Was it deleted in another tab?",
+            "permissionDenied": "Your role doesn't include editing articles.",
+            "notStaff": "You need to be signed in as staff to edit.",
+            "internal": "Something went wrong on our end. Try again in a moment."
+          }
+        },
+        "toolbar": {
+          "bold": "Bold",
+          "italic": "Italic",
+          "underline": "Underline",
+          "strike": "Strikethrough",
+          "code": "Inline code",
+          "h2": "Heading 2",
+          "h3": "Heading 3",
+          "bulletList": "Bullet list",
+          "orderedList": "Numbered list",
+          "blockquote": "Quote",
+          "divider": "Divider",
+          "link": "Link",
+          "unlink": "Remove link",
+          "alignLeft": "Align left",
+          "alignCenter": "Align center",
+          "alignRight": "Align right",
+          "color": "Text color",
+          "highlight": "Highlight",
+          "undo": "Undo",
+          "redo": "Redo",
+          "codeBlock": "Code block",
+          "linkPrompt": "Link URL",
+          "image": "Upload image"
+        },
+        "cropDialog": {
+          "title": "Crop image",
+          "description": "Drag the corners to crop. Click \"Use original\" to skip.",
+          "applyCrop": "Apply crop",
+          "useOriginal": "Use original",
+          "cancel": "Cancel",
+          "processing": "Processing…"
+        },
+        "translations": {
+          "addTranslation": "Add translation",
+          "version": "Version",
+          "autosave": {
+            "idle": "Autosave on. Changes save 2 seconds after you stop typing.",
+            "saving": "Saving…",
+            "failed": "Autosave failed. Click \"Save translation\" to retry."
+          },
+          "copyFromLocale": {
+            "trigger": "Copy from…",
+            "heading": "Source language",
+            "overwriteTitle": "Replace current draft?",
+            "overwriteConfirm": "Replace the current draft with the source language's text? Your unsaved changes will be lost.",
+            "confirmYes": "Replace",
+            "confirmNo": "Cancel"
+          },
+          "htmlSource": {
+            "open": "View HTML",
+            "title": "HTML source",
+            "close": "Close",
+            "copy": "Copy",
+            "copied": "Copied"
+          },
+          "stats": {
+            "words": "%count% words",
+            "readingTime": "~%count% min read"
+          },
+          "picker": {
+            "heading": "Language",
+            "cancel": "Cancel",
+            "titlePlaceholder": "Working title in this language",
+            "submit": "Add",
+            "submitting": "Adding…",
+            "allLocalesPresent": "All supported locales are already added."
+          },
+          "fields": {
+            "title": "Title",
+            "subtitle": "Subtitle",
+            "excerpt": "Excerpt",
+            "body": "Body",
+            "bodyPlaceholder": "Write the article body here.",
+            "seoTitle": "SEO title",
+            "seoTitleHelp": "Defaults to article title when blank.",
+            "seoDescription": "SEO description",
+            "seoDescriptionHelp": "Defaults to the excerpt when blank."
+          },
+          "errors": {
+            "titleRequired": "Title is required.",
+            "alreadyExists": "A translation in that language already exists."
+          }
+        }
+      }
+    }
   }
 }

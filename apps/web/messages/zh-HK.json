@@ -2,6 +2,7 @@
   "locale": "zh-HK",
   "nav": {
     "shows": "欄目",
+    "articles": "文章",
     "pricing": "訂閱方案",
     "live": "直播課",
     "community": "社群",
@@ -765,8 +766,17 @@
     "pagination": "第 1 頁 / 共 34 頁 · 412 期"
   },
   "dashboard": {
-    "greeting": "早安,",
-    "reader": "Selina K.",
+    "greeting": "歡迎返嚟,",
+    "reader": "讀者",
+    "browse": {
+      "title": "瀏覽編輯部",
+      "count": "{count, plural, =0 {仲未有文章} other {已發佈 # 篇文章}}"
+    },
+    "recent": {
+      "title": "編輯部最新",
+      "sub": "最近發佈嘅稿件。",
+      "empty": "暫無已發佈嘅文章。"
+    },
     "nav": [
       "總覽",
       "閱讀",
@@ -1005,5 +1015,272 @@
     "bridgeTitle": "為甚麼做一座太平洋上的橋。",
     "bridge": "我們認為下一個十年的投資需要用兩種語言讀兩個市場,且用同一套標準。美股有可信的英語財經媒體;大中華有可信的中文財經媒體;但目前還沒有一支編輯部由同一批人,用同一套標準,為認真的讀者兩邊都寫。我們要做那一支。",
     "contact": "傳媒、招聘與合作:hello@aito.io"
+  },
+  "articleIndex": {
+    "heading": "文章",
+    "subheading": "AITO 編輯部已發佈嘅全部稿件。",
+    "empty": "暫無已發佈嘅文章。",
+    "by": "作者:",
+    "prev": "上一頁",
+    "next": "下一頁",
+    "paginationCount": "第 {page} 頁 / 共 {total} 頁"
+  },
+  "admin": {
+    "appName": "AITO",
+    "backToSite": "返回站台",
+    "signedInAs": "目前登入",
+    "comingSoon": "稍後上線",
+    "backToDashboard": "返回控制台",
+    "nav": {
+      "dashboard": "控制台",
+      "articles": "文章",
+      "reviews": "審核",
+      "users": "用戶",
+      "settings": "設定"
+    },
+    "dashboard": {
+      "heading": "編輯部後台",
+      "subheading": "建立文章、管理翻譯、發佈。使用左側導覽或下方入口。"
+    },
+    "tiles": {
+      "articles": "文章",
+      "articlesDesc": "查看草稿同已發佈嘅稿件,建立新文章。",
+      "reviews": "審核佇列",
+      "reviewsDesc": "等緊編輯審核嘅文章。通過或退回意見。",
+      "users": "用戶",
+      "usersDesc": "查詢讀者同編輯,查看訂閱狀態。",
+      "settings": "設定",
+      "settingsDesc": "平台級開關。合規、試用期、功能旗標。"
+    },
+    "placeholders": {
+      "articles": "文章清單會喺 Phase A 第 3 日上線。目前可用即將上線嘅新建表單開始草稿。",
+      "reviews": "編輯審核流程喺 Phase B 實現。現階段編輯直接由草稿按發佈。",
+      "users": "用戶唯讀視圖喺 Phase B 實現。現階段以 Prisma Studio 為準。",
+      "settings": "設定介面喺 Phase B 實現。現階段喺 Prisma Studio 修改 PlatformSetting 行。"
+    },
+    "articles": {
+      "heading": "文章",
+      "subheading": "所有草稿、已發佈同已歸檔嘅稿件。撳條目入去編輯。",
+      "localeNames": {
+        "en": "英文",
+        "zh-CN": "簡體中文",
+        "zh-HK": "繁體中文(香港)"
+      },
+      "newArticle": "新建文章",
+      "searchPlaceholder": "按標題搜尋…",
+      "untitled": "(無標題)",
+      "updatedAt": "更新於",
+      "empty": "未有文章。由新建草稿開始。",
+      "emptyWithSearch": "冇標題包含 \"{q}\" 嘅文章。",
+      "prev": "上一頁",
+      "next": "下一頁",
+      "paginationCount": "{from}–{to} 條,共 {total} 條",
+      "tabs": {
+        "all": "全部",
+        "draft": "草稿",
+        "published": "已發佈",
+        "archived": "已歸檔",
+        "other": "其他"
+      },
+      "status": {
+        "draft": "草稿",
+        "in_review": "審核中",
+        "legal_review": "法務審核",
+        "scheduled": "已排期",
+        "published": "已發佈",
+        "archived": "已歸檔"
+      },
+      "new": {
+        "backToList": "返回文章清單",
+        "heading": "新建文章",
+        "subheading": "揀類型、起始語言同暫用標題。其餘欄位可以喺下一頁繼續整。",
+        "kind": "類型",
+        "kindOptions": {
+          "newsletter": "通訊",
+          "podcast": "播客",
+          "blog": "網誌文章"
+        },
+        "locale": "起始語言",
+        "localeHelp": "可以喺編輯器入面加其他語言。讀者站台會按訪客語言優雅回退。",
+        "title": "暫用標題",
+        "titleHelp": "之後可改,用嚟自動建議下面嘅 URL 欄位。",
+        "slug": "URL 標識",
+        "slugHelp": "只接受細寫字母、數字同連字符。最後路徑係 /articles/ 之後嗰段。",
+        "slugAutoNote": "(根據標題自動建議,撳一下就可以改)",
+        "submit": "新增草稿",
+        "submitting": "建立中…",
+        "errors": {
+          "validation": "請檢查標紅嘅欄位。",
+          "titleRequired": "請填標題。",
+          "slugInvalid": "標識只能用細寫字母、數字同連字符。",
+          "slugTaken": "呢個標識已經有人用,請換一個。",
+          "permissionDenied": "你嘅角色未包含起草文章權限。請搵管理員。",
+          "notStaff": "需要用編輯帳戶登入先可以新建文章。",
+          "internal": "伺服器出咗錯,請稍後再試。"
+        }
+      },
+      "edit": {
+        "backToList": "返回文章清單",
+        "untitled": "(無標題)",
+        "metadataHeading": "文章元資料",
+        "metadataSub": "URL 標識、付費檔位、分類、作者、標籤同合規分級。SEO 覆寫選項喺下面按翻譯分開設定。",
+        "translationsHeading": "多語言版本",
+        "translationsSub": "至少要一種語言。當訪客嘅語言版本缺失時,公眾站台會優雅回退去已有嘅語言。",
+        "preview": "預覽",
+        "previewTitle": "喺新分頁打開公眾文章頁。草稿會帶埋 ?preview=1,編輯可見。",
+        "actions": {
+          "publish": "發佈",
+          "unpublish": "取消發佈",
+          "archive": "歸檔",
+          "unarchive": "解除歸檔",
+          "confirmTitle": {
+            "publish": "確認發佈?",
+            "unpublish": "確認取消發佈?",
+            "archive": "確認歸檔?"
+          },
+          "confirmPublish": "即刻發佈?讀者會按所屬檔位睇到全文。",
+          "confirmUnpublish": "將呢篇文章由公眾視圖下線?之後隨時可以重新發佈。",
+          "confirmArchivePublished": "歸檔呢篇已發佈嘅文章?讀者將會見唔到。",
+          "confirmYes": "確認",
+          "confirmNo": "取消",
+          "errors": {
+            "illegal": "目前狀態唔允許呢個操作。",
+            "missingTranslation": "發佈前請最少加一種語言嘅翻譯。"
+          }
+        },
+        "form": {
+          "slug": "URL 標識",
+          "slugHelp": "只接受細寫字母、數字同連字符。最後路徑係 /articles/ 之後嗰段。",
+          "kind": "類型",
+          "kindOptions": {
+            "newsletter": "通訊",
+            "podcast": "播客",
+            "blog": "網誌文章"
+          },
+          "requiredTier": "所需檔位",
+          "requiredTierHelp": "閱讀全文所需嘅訂閱檔位。草稿喺發佈之前唔受此限制。",
+          "tierOptions": {
+            "free": "免費(公開)",
+            "premium": "Premium",
+            "pro": "Pro Desk"
+          },
+          "complianceClass": "合規分級",
+          "complianceHelp": "決定本篇喺編輯審核流程中嘅處理方式。",
+          "complianceOptions": {
+            "general_information": "一般資訊",
+            "educational": "教育內容",
+            "market_commentary": "市場評論",
+            "specific_recommendation": "具體投資建議(觸發法務審核)"
+          },
+          "category": "分類",
+          "categoryNone": "(無)",
+          "authors": "作者",
+          "authorsEmpty": "未有指定作者 — 發佈前至少加一位。",
+          "authorsCreateNew": "新增作者",
+          "tags": "標籤",
+          "tagsEmpty": "未有標籤。",
+          "heroImageUrl": "封面圖 URL",
+          "heroImageHelp": "Phase A 只支援 URL。上傳圖片功能會喺第 7 日上線。",
+          "save": "保存元資料",
+          "saving": "保存中…",
+          "saved": "已保存",
+          "unsaved": "未保存",
+          "errors": {
+            "validation": "請檢查標紅嘅欄位。",
+            "slugRequired": "請填 URL 標識。",
+            "slugInvalid": "URL 標識只能用細寫字母、數字同連字符。",
+            "slugTaken": "呢個標識已經有人用。",
+            "notFound": "搵唔到呢篇文章,可能已經喺另一個分頁刪咗。",
+            "permissionDenied": "你嘅角色未包含編輯文章權限。",
+            "notStaff": "需要用編輯帳戶登入先可以修改。",
+            "internal": "伺服器出咗錯,請稍後再試。"
+          }
+        },
+        "toolbar": {
+          "bold": "加粗",
+          "italic": "斜體",
+          "underline": "底線",
+          "strike": "刪除線",
+          "code": "行內程式碼",
+          "h2": "二級標題",
+          "h3": "三級標題",
+          "bulletList": "項目符號",
+          "orderedList": "編號清單",
+          "blockquote": "引用",
+          "divider": "分隔線",
+          "link": "連結",
+          "unlink": "移除連結",
+          "alignLeft": "左對齊",
+          "alignCenter": "置中",
+          "alignRight": "右對齊",
+          "color": "字體色",
+          "highlight": "背景高亮",
+          "undo": "復原",
+          "redo": "重做",
+          "codeBlock": "程式碼區塊",
+          "linkPrompt": "連結 URL",
+          "image": "上載圖片"
+        },
+        "cropDialog": {
+          "title": "裁剪圖片",
+          "description": "拖動四角調整裁剪框。點擊「使用原圖」可跳過裁剪。",
+          "applyCrop": "套用裁剪",
+          "useOriginal": "使用原圖",
+          "cancel": "取消",
+          "processing": "處理中…"
+        },
+        "translations": {
+          "addTranslation": "新增翻譯",
+          "version": "版本",
+          "autosave": {
+            "idle": "已開啟自動保存,停止輸入 2 秒後自動保存。",
+            "saving": "保存中…",
+            "failed": "自動保存失敗,請撳「保存翻譯」重試。"
+          },
+          "copyFromLocale": {
+            "trigger": "由其他語言複製…",
+            "heading": "來源語言",
+            "overwriteTitle": "覆寫目前草稿?",
+            "overwriteConfirm": "確定用所選語言嘅文本取代當前草稿?未保存嘅修改會冇咗。",
+            "confirmYes": "覆寫",
+            "confirmNo": "取消"
+          },
+          "htmlSource": {
+            "open": "查看 HTML",
+            "title": "HTML 原始碼",
+            "close": "關閉",
+            "copy": "複製",
+            "copied": "已複製"
+          },
+          "stats": {
+            "words": "%count% 字",
+            "readingTime": "約 %count% 分鐘閱讀"
+          },
+          "picker": {
+            "heading": "語言",
+            "cancel": "取消",
+            "titlePlaceholder": "呢個語言嘅暫用標題",
+            "submit": "新增",
+            "submitting": "新增中…",
+            "allLocalesPresent": "已加齊所有支援嘅語言。"
+          },
+          "fields": {
+            "title": "標題",
+            "subtitle": "副標題",
+            "excerpt": "摘要",
+            "body": "正文",
+            "bodyPlaceholder": "喺度寫正文。",
+            "seoTitle": "SEO 標題",
+            "seoTitleHelp": "留空時預設用文章標題。",
+            "seoDescription": "SEO 描述",
+            "seoDescriptionHelp": "留空時預設用摘要。"
+          },
+          "errors": {
+            "titleRequired": "請填標題。",
+            "alreadyExists": "呢個語言已經有翻譯。"
+          }
+        }
+      }
+    }
   }
 }

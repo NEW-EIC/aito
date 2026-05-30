@@ -11,9 +11,14 @@ import { AuthInput } from "./AuthInput";
 
 interface SignInFormProps {
   redirectTo?: string;
+  /** True when the user landed on /sign-in?redirectTo=… with an explicit
+   *  target. False when there was no query param (and `redirectTo` was
+   *  defaulted to `/dashboard` by sanitizeRedirectTo). Staff users land
+   *  on /admin by default but follow an explicit target verbatim. */
+  explicitRedirect?: boolean;
 }
 
-export function SignInForm({ redirectTo }: SignInFormProps) {
+export function SignInForm({ redirectTo, explicitRedirect }: SignInFormProps) {
   const t = useTranslations("auth.signIn");
   const tErr = useTranslations("auth.errors");
   const router = useRouter();
@@ -31,7 +36,11 @@ export function SignInForm({ redirectTo }: SignInFormProps) {
       const res = await authFetch("/api/auth/signin", {
         body: { email, password },
       });
-      const json = (await res.json()) as { error?: string; lockoutMinutes?: number };
+      const json = (await res.json()) as {
+        error?: string;
+        lockoutMinutes?: number;
+        isStaff?: boolean;
+      };
       if (!res.ok) {
         if (json.error === "tooManyAttempts" && json.lockoutMinutes) {
           setError(tErr("tooManyAttempts", { minutes: json.lockoutMinutes }));
@@ -44,9 +53,19 @@ export function SignInForm({ redirectTo }: SignInFormProps) {
         }
         return;
       }
-      // next-intl's router auto-prefixes the locale. Strip any locale that's
-      // already on the redirectTo so we don't end up at /zh-CN/zh-CN/...
-      router.push(stripLocale(sanitizeRedirectTo(redirectTo)));
+      // Pick the destination:
+      //   - explicit `?redirectTo=…` in the URL → honour it
+      //   - no redirect param + user is staff → /admin
+      //   - no redirect param + regular user → /dashboard (the default
+      //     `redirectTo` prop value)
+      // next-intl's router auto-prefixes the locale; stripLocale guards
+      // against the locale appearing twice when the redirectTo carried
+      // one already.
+      const destination =
+        !explicitRedirect && json.isStaff
+          ? "/admin"
+          : sanitizeRedirectTo(redirectTo);
+      router.push(stripLocale(destination));
       router.refresh();
     } catch {
       setError(tErr("unknown"));
