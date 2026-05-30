@@ -1245,3 +1245,187 @@ Manual smoke (against local docker DB):
   outstanding from Day 6's original brief. Rolled into Day 7
   because they're tiny toolbar additions and pair with the
   image work spec-wise.
+
+---
+
+### Day 7 — 2026-05-30 — Image upload (Vercel Blob + drag / paste / toolbar)
+
+Closes: "How do I add a screenshot?"
+
+**Shipped**
+
+Dependencies:
+
+- `@vercel/blob` v2 — `put(pathname, body, opts)` with implicit
+  `BLOB_READ_WRITE_TOKEN` env.
+- `@tiptap/extension-image` v3 — block image node with
+  `src` / `alt` / `title` attributes.
+
+Upload endpoint:
+
+- `apps/web/src/app/api/admin/upload/image/route.ts` — POST
+  multipart/form-data. Guards on `media.upload` permission
+  (StaffAuthError → typed 401/403). MIME allowlist
+  (jpeg/png/webp/gif/avif), 8 MB hard cap. Stable pathname
+  `articles/<uuid>.<ext>` with `addRandomSuffix: false` since
+  we already UUID-prefix. Returns
+  `{ ok, url, pathname, contentType, size }`. Writes one
+  audit row per upload (resourceType: "media", reusing the
+  existing `article.created` action key — Day 9 will add a
+  proper `media.uploaded` action).
+
+Client helper:
+
+- `apps/web/src/components/admin/editor/uploadImage.ts` —
+  `uploadImageFile(file): Promise<UploadImageResult>`. Single
+  funnel for the three upload paths (drag-drop, paste, toolbar)
+  so error handling + audit shape are identical.
+
+Editor integration (`apps/web/src/components/admin/editor/Editor.tsx`):
+
+- Added `Image` extension. `inline: false` because images
+  always render block; `allowBase64: true` only inside the
+  editor session (sanitiser strips it on serialise — see below).
+  `loading="lazy"` baked into HTMLAttributes.
+- Added `"image"` to TextAlign's `types` array so editors can
+  centre / right-align an image with the existing alignment
+  buttons.
+- New `insertImageAtPosition(file, pos)` helper:
+  1. Insert a 1×1 transparent GIF data-URL placeholder at the
+     position (or selection) with a unique marker in the
+     `title` attribute.
+  2. Call `uploadImageFile(file)`.
+  3. Walk the doc to find the node (it may have moved if the
+     editor was typed into during upload — the marker is the
+     identifier).
+  4. On success: `updateAttributes` to swap src for the real
+     Blob URL and set `alt` to the filename minus extension.
+  5. On failure: delete the placeholder and log to console
+     (Phase B can swap for a toast).
+- `editorRef` mirrors the editor instance so the drop / paste
+  handler closures (captured at `useEditor` config time) can
+  reach it after async upload completes.
+- `editorProps.handleDrop` — filters dropped `DataTransfer`
+  files to images, computes the insert position from
+  `view.posAtCoords({clientX, clientY})`, and routes each
+  through `insertImageAtPosition`.
+- `editorProps.handlePaste` — same shape on
+  `clipboardData.files`, used for screenshots (Cmd+Shift+4
+  on macOS) and copy-from-Photos.
+
+Toolbar (`apps/web/src/components/admin/editor/Toolbar.tsx`):
+
+- Adds an "Upload image" button next to link/unlink, gated on
+  the new optional `onUploadImage` prop. Click → opens a
+  hidden `<input type="file" accept="image/...">`. Resets
+  `e.target.value = ""` after pick so the same file can be
+  picked twice in a row.
+
+Sanitiser tightening (`apps/web/src/lib/admin/sanitize.ts`):
+
+- Removed the `data:image/...` carve-out. Now every `src`
+  must be http(s) / mailto / tel / relative / anchor. The
+  editor's paste handler uploads pasted base64 to Blob and
+  rewrites src to the real URL before the document is
+  persisted, so a `data:` URL surviving sanitise means
+  something else is wrong (upload failed silently, or a
+  non-editor source wrote raw HTML) — drop the image rather
+  than bloat every served page with megabytes of base64.
+- 2 new tests: rejects `data:image/png;base64,...`, accepts
+  `https://blob.vercel.com/...`. Total sanitiser tests
+  14 → 16.
+
+i18n: 1 new `admin.articles.edit.toolbar.image` key per locale.
+
+**Verifies**
+
+- `pnpm --filter @aito/web type-check` → clean
+- `pnpm --filter @aito/web test` → 87 passing (85 → 87 from
+  the 2 new sanitiser tests)
+- `pnpm --filter @aito/web build` → green
+  - Edit route bundle 142 kB → 146 kB (Image extension +
+    upload helper added)
+  - New `ƒ /api/admin/upload/image` registered (179 B route +
+    100 kB shared)
+
+Manual smoke (against local docker DB + Vercel Blob token in
+`.env.local`):
+
+1. `BLOB_READ_WRITE_TOKEN=vercel_blob_rw_...` in `apps/web/.env.local`
+2. `pnpm web:dev`, sign in as `demo-admin@aito.io`
+3. Open edit page → translations tab
+4. Drag a screenshot from Finder onto the editor body →
+   placeholder appears immediately → real image swaps in
+   ~500 ms
+5. Cmd+Shift+4, take a screenshot, focus the editor, Cmd+V →
+   image inserts at cursor
+6. Toolbar → image button → pick from file dialog → same flow
+7. Centre-align inserted image with the alignment buttons
+8. Save → version bumps → reload the page → image still there,
+   src is `https://[blob hostname]/articles/<uuid>.png`
+9. As a regular user visit the article → image renders
+10. Try uploading a 10 MB PNG → server returns 413, console
+    logs the failure, placeholder removed cleanly
+
+**Decisions**
+
+- **No custom Figure/caption node.** TipTap requires a custom
+  Node spec (parseHTML / renderHTML / commands, ~80 lines) and
+  ProseMirror's schema constraints around `paragraph inside
+  figure` make caption editing fragile. Editorial workaround:
+  caption goes in the next paragraph as italic — good enough
+  for Phase A. Phase B can add a proper Figure node when there's
+  a real ask for inline captions.
+- **No font-size / line-height presets / first-line indent.**
+  TipTap doesn't ship these as built-in marks; each needs a
+  small custom Mark extension (~50 lines). With the image
+  work taking the day's budget, deferred to Phase B where they
+  can ship together as a "typography pack" extension.
+- **Upload through our route, not direct-to-Blob.** Direct
+  upload via Blob's `handleUpload` callback skips the
+  permission check, the MIME / size cap, and the audit row.
+  Editors are server-trusted users so the extra hop's latency
+  is fine, and Day 9's audit-viewer needs the rows.
+- **Optimistic placeholder over disable-while-uploading.**
+  Drag-drop UX expects the image to "land" instantly. Showing
+  a 1×1 transparent GIF with a marker (then swapping `src`)
+  gives that feel without making the editor wait for the
+  upload. Marker is in the `title` attribute because TipTap's
+  Image extension allows that attribute through; using a
+  custom data-* attribute would need a Node spec extension.
+- **Walk the doc to find the placeholder after upload.** The
+  insert position may not match after upload because the
+  editor was typed into. Walking `state.doc.descendants` with
+  the marker is O(n) but n is small (single article body);
+  no need for a marker map.
+- **`allowBase64: true` on the Image extension but data: URLs
+  forbidden by the sanitiser.** The editor needs to accept the
+  base64 placeholder *during* the upload session; the
+  sanitiser runs on serialise / on render and catches any
+  base64 that survived (e.g. upload failure that didn't
+  remove the placeholder cleanly). Two layers, by design.
+- **8 MB cap.** Editorial JPEGs sit under 2 MB; 8 MB leaves
+  room for the occasional 4K screenshot without inviting
+  stock-photo dumps. Editors who hit the cap should
+  pre-compress (which is the right behavior anyway).
+- **`media.uploaded` audit key not yet in the enum.** Reusing
+  `article.created` for now; Day 9's audit cleanup will add
+  the proper key alongside `article.metadata.updated` and the
+  state-transition keys.
+
+**Carry-over for production**
+
+- **Vercel project needs Blob enabled.** Settings → Storage →
+  Create Database → Blob. Vercel injects
+  `BLOB_READ_WRITE_TOKEN` automatically — no extra env var
+  configuration needed.
+- **Local dev needs the token in `.env.local`.** Pull from
+  Vercel via `vercel env pull apps/web/.env.local` after
+  linking the project.
+
+**Carry-over**
+
+- Day 8: Publish / Unpublish / Archive buttons on the edit
+  page, HTML-source toggle, preview tab, word count, Cmd+S.
+  Calls the existing `articleTransition()` state machine for
+  every transition.

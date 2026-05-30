@@ -1171,7 +1171,8 @@
           "undo": "復原",
           "redo": "重做",
           "codeBlock": "程式碼區塊",
-          "linkPrompt": "連結 URL"
+          "linkPrompt": "連結 URL",
+          "image": "上載圖片"
         },
         "translations": {
           "addTranslation": "新增翻譯",

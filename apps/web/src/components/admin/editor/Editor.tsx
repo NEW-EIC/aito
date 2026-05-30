@@ -7,9 +7,11 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
+import Image from "@tiptap/extension-image";
 import { useEffect, useRef } from "react";
 import { Toolbar } from "./Toolbar";
 import { sanitizeHtml } from "@/lib/admin/sanitize";
+import { uploadImageFile } from "./uploadImage";
 
 interface Props {
   /** Initial HTML to load. Subsequent updates to this prop reset the editor
@@ -40,6 +42,84 @@ export function Editor({
     onChangeRef.current = onChange;
   }, [onChange]);
 
+  // Editor reference for use inside the drop/paste handlers — they run
+  // before `useEditor` returns, but their closures fire async on user
+  // interaction, by which time the ref has been populated.
+  const editorRef = useRef<TiptapEditor | null>(null);
+
+  // Insert an image at a position. Optimistically inserts a placeholder
+  // (a known data URL via the Image extension's allowBase64 path) so
+  // the editor sees something immediately, then swaps src after the
+  // real upload completes. On failure removes the placeholder.
+  async function insertImageAtPosition(
+    file: File,
+    pos: number | null,
+  ): Promise<void> {
+    const ed = editorRef.current;
+    if (!ed) return;
+
+    // 1×1 transparent placeholder. Cheap, parseable as a real image by
+    // the browser so the editor lays out a block.
+    const PLACEHOLDER =
+      "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+    const marker = `pending-${crypto.randomUUID()}`;
+
+    const insertCmd = ed
+      .chain()
+      .focus()
+      .insertContentAt(pos ?? ed.state.selection.from, {
+        type: "image",
+        attrs: {
+          src: PLACEHOLDER,
+          alt: `Uploading ${file.name}…`,
+          title: marker, // we use this to find the node on success/failure
+        },
+      });
+    insertCmd.run();
+
+    const result = await uploadImageFile(file);
+
+    // Find the node we inserted (it may have moved if the editor was
+    // typed into during upload). Walk the doc looking for our marker.
+    const findPos = (): number | null => {
+      let found: number | null = null;
+      ed.state.doc.descendants((node, p) => {
+        if (node.type.name === "image" && node.attrs.title === marker) {
+          found = p;
+          return false;
+        }
+        return true;
+      });
+      return found;
+    };
+
+    const targetPos = findPos();
+    if (targetPos === null) return; // node was deleted during upload
+
+    if (!result.ok) {
+      // Remove the placeholder + show a non-blocking message via the
+      // browser's prompt-less alert path. Phase B could replace this
+      // with a toast.
+      ed.chain()
+        .focus()
+        .deleteRange({ from: targetPos, to: targetPos + 1 })
+        .run();
+      console.warn(`[editor] image upload failed (${result.code}):`, result.message);
+      return;
+    }
+
+    // Replace the placeholder node in-place with the real URL.
+    ed.chain()
+      .focus()
+      .setNodeSelection(targetPos)
+      .updateAttributes("image", {
+        src: result.url,
+        alt: file.name.replace(/\.[a-z0-9]+$/i, ""),
+        title: null,
+      })
+      .run();
+  }
+
   const editor = useEditor({
     extensions: [
       // StarterKit v3 ships Bold / Italic / Strike / Underline / Heading
@@ -67,8 +147,25 @@ export function Editor({
       Color.configure({ types: ["textStyle"] }),
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({
-        types: ["heading", "paragraph"],
+        // Add "image" so users can centre / right-align an image. The
+        // Image extension renders as a block node and accepts the
+        // textAlign attribute via the same wrapper that handles
+        // headings and paragraphs.
+        types: ["heading", "paragraph", "image"],
         defaultAlignment: "left",
+      }),
+      Image.configure({
+        inline: false,
+        // We never want the raw HTML allowlist to permit a fresh `<img>`
+        // an editor might paste before upload finishes. ProseMirror's
+        // schema still permits `<img>` (we transform pasted data: URLs
+        // → real uploads in handlePaste below) but renders go through
+        // the sanitiser anyway as defense-in-depth.
+        allowBase64: true,
+        HTMLAttributes: {
+          class: "tiptap-image",
+          loading: "lazy",
+        },
       }),
       Placeholder.configure({
         placeholder: placeholder ?? "",
@@ -97,8 +194,46 @@ export function Editor({
       // `transformPastedText` (unused here — TipTap turns text into
       // paragraphs natively, no sanitising needed for text).
       transformPastedHTML: (html) => sanitizeHtml(html),
+      // Drag-drop a file from Finder/Explorer onto the editor.
+      handleDrop(view, event, _slice, moved) {
+        if (moved) return false; // internal node drag, let TipTap handle
+        const files = Array.from(event.dataTransfer?.files ?? []).filter((f) =>
+          f.type.startsWith("image/"),
+        );
+        if (files.length === 0) return false;
+        event.preventDefault();
+        const coords = view.posAtCoords({
+          left: event.clientX,
+          top: event.clientY,
+        });
+        const pos = coords?.pos ?? view.state.selection.from;
+        for (const file of files) {
+          void insertImageAtPosition(file, pos);
+        }
+        return true;
+      },
+      // Cmd-V on a clipboard image (screenshot / copied-from-Photos).
+      // TipTap doesn't ship a built-in for this; we look for image
+      // files on the clipboardData.
+      handlePaste(_view, event) {
+        const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
+          f.type.startsWith("image/"),
+        );
+        if (files.length === 0) return false;
+        event.preventDefault();
+        for (const file of files) {
+          void insertImageAtPosition(file, null);
+        }
+        return true;
+      },
     },
   });
+
+  // Mirror the editor instance into a ref so the drop / paste handlers
+  // (closures captured at useEditor config time) can reach it.
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
 
   // When `disabled` flips externally we tell the editor to match.
   useEffect(() => {
@@ -120,7 +255,11 @@ export function Editor({
 
   return (
     <div className="rounded-md border border-border bg-surface focus-within:border-fg/40">
-      <Toolbar editor={editor} labels={toolbarLabels} />
+      <Toolbar
+        editor={editor}
+        labels={toolbarLabels}
+        onUploadImage={(file) => insertImageAtPosition(file, null)}
+      />
       <EditorContent editor={editor} />
     </div>
   );

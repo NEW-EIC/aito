@@ -1171,7 +1171,8 @@
           "undo": "撤销",
           "redo": "重做",
           "codeBlock": "代码块",
-          "linkPrompt": "链接 URL"
+          "linkPrompt": "链接 URL",
+          "image": "上传图片"
         },
         "translations": {
           "addTranslation": "添加翻译",

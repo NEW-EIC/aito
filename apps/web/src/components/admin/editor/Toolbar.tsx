@@ -1,6 +1,7 @@
 "use client";
 
 import type { Editor } from "@tiptap/react";
+import { useRef } from "react";
 import {
   Bold,
   Italic,
@@ -22,6 +23,7 @@ import {
   Undo,
   Redo,
   Code2,
+  Image as ImageIcon,
 } from "lucide-react";
 
 export interface ToolbarLabels {
@@ -47,11 +49,16 @@ export interface ToolbarLabels {
   redo: string;
   codeBlock: string;
   linkPrompt: string;
+  image: string;
 }
 
 interface Props {
   editor: Editor | null;
   labels: ToolbarLabels;
+  /** Called when the user picks a file from the image-upload button.
+   *  The Editor wraps the same `insertImageAtPosition` used by
+   *  drag-drop / paste — keeps one upload code path. */
+  onUploadImage?: (file: File) => void | Promise<void>;
 }
 
 // A small palette — enough for editorial colour-coding without overwhelm.
@@ -72,7 +79,9 @@ const HIGHLIGHTS = [
   { label: "pink", value: "#fbcfe8" },
 ];
 
-export function Toolbar({ editor, labels }: Props) {
+export function Toolbar({ editor, labels, onUploadImage }: Props) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   if (!editor) {
     return (
       <div className="h-11 border-b border-border bg-bg-alt/40" />
@@ -229,6 +238,28 @@ export function Toolbar({ editor, labels }: Props) {
         >
           <Unlink className="size-4" />
         </Btn>
+        {onUploadImage && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void onUploadImage(file);
+                // Reset so picking the same file twice still fires.
+                e.target.value = "";
+              }}
+            />
+            <Btn
+              label={labels.image}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <ImageIcon className="size-4" />
+            </Btn>
+          </>
+        )}
       </Group>
 
       <Divider />

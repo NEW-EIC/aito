@@ -43,6 +43,21 @@ describe("sanitizeHtml — XSS defenses", () => {
     );
     expect(out).not.toMatch(/iframe|object|embed/i);
   });
+
+  it("rejects data: URLs on <img src> (Day 7 — paste-image uploads to Blob first)", () => {
+    const dataUrl =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+    const out = sanitizeHtml(`<img src="${dataUrl}" alt="x" />`);
+    expect(out).not.toMatch(/data:/i);
+  });
+
+  it("keeps https: URLs on <img src>", () => {
+    const out = sanitizeHtml(
+      '<img src="https://blob.vercel.com/articles/a.png" alt="cover" />',
+    );
+    expect(out).toMatch(/src="https:/);
+    expect(out).toMatch(/alt="cover"/);
+  });
 });
 
 describe("sanitizeHtml — WeChat / Word paste cleanup", () => {

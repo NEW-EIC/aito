@@ -250,6 +250,7 @@ export default async function EditArticlePage({
                 redo: tToolbar("redo"),
                 codeBlock: tToolbar("codeBlock"),
                 linkPrompt: tToolbar("linkPrompt"),
+                image: tToolbar("image"),
               },
               autosave: {
                 idle: tTabs("autosave.idle"),

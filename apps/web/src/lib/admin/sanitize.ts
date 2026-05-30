@@ -110,17 +110,19 @@ function installHooksOnce() {
     }
   });
 
-  // Validate href / src URL schemes — no javascript:, data: (except inline
-  // images that future Day 7 work might paste), no file:, etc.
+  // Validate href / src URL schemes — http(s) / mailto / tel / relative /
+  // anchor only. We deliberately reject `data:` URLs even for images
+  // because the editor's paste-image handler (Day 7) uploads pasted
+  // base64 to Vercel Blob and rewrites the src to a real URL before
+  // the document is persisted. A `data:` URL surviving sanitise here
+  // would mean the upload failed silently or a non-editor source
+  // wrote raw HTML — in either case we'd rather drop the image than
+  // bloat every served page with megabytes of base64.
   DOMPurify.addHook("uponSanitizeAttribute", (_node, data) => {
     if (data.attrName !== "href" && data.attrName !== "src") return;
     const url = (data.attrValue ?? "").trim();
     if (url === "") {
       data.keepAttr = false;
-      return;
-    }
-    if (data.attrName === "src" && url.startsWith("data:image/")) {
-      // Day 7: tighten this to the specific mime types we allow.
       return;
     }
     if (!URL_SCHEMES_REGEX.test(url)) {
