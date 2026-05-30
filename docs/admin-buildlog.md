@@ -1620,3 +1620,180 @@ Manual smoke (against local docker DB):
   Playwright test covering create → publish → public-site
   reads; admin runbook + admin backlog docs; staging
   deploy walkthrough.
+
+---
+
+### Day 9 — 2026-05-30 — Phase A wrap: i18n audit, E2E, runbook, backlog
+
+Closes: "Can a real editor use this?"
+
+**Shipped**
+
+i18n audit:
+
+- Diffed the `admin.*` namespace across en / zh-CN / zh-HK.
+  Result: **177 keys, 0 missing in either zh locale.** Three
+  values are intentionally identical to en (`appName: AITO`,
+  `tierOptions.premium: Premium`, `tierOptions.pro: Pro Desk`)
+  — brand names, no translation needed.
+- The Day 1 plan was to batch-translate on Day 9; the
+  reality is each day's small set was translated by hand at
+  the time, so the batch is empty. Logged the audit script
+  inline below for future reference.
+- Audit one-liner (anytime):
+  ```
+  node -e "const fs=require('fs');const f=l=>fs.readFileSync(\`apps/web/messages/\${l}.json\`,'utf8');\
+  const flat=(o,p='')=>Object.fromEntries(Object.entries(o).flatMap(([k,v])=>v&&typeof v==='object'&&!Array.isArray(v)?\
+  Object.entries(flat(v,p?p+'.'+k:k)):[[p?p+'.'+k:k,v]]));\
+  const en=flat(JSON.parse(f('en')).admin);\
+  for(const l of ['zh-CN','zh-HK']){\
+    const z=flat(JSON.parse(f(l)).admin);\
+    const miss=Object.keys(en).filter(k=>!(k in z));\
+    console.log(l,'missing:',miss.length);\
+  }"
+  ```
+
+Editor-facing runbook:
+
+- `docs/admin-runbook.md` — 250+ lines covering: getting in,
+  the four tiles, the article lifecycle diagram, step-by-step
+  for creating an article, the metadata form, the WYSIWYG
+  editor (toolbar groups, image upload paths, paste behaviour,
+  Cmd+S, View HTML, copy-from-locale), publishing workflow,
+  common errors (slug taken, missing translation, permission,
+  autosave failed, image upload silent fail, paste lost
+  formatting), what's not in Phase A (cross-links to backlog),
+  and a local dev cheat-sheet with the four demo accounts.
+- Written for an editor with zero engineering background.
+  Engineering details all stay in admin-buildlog / runbook
+  for stripe / runbook for deploy.
+
+Phase B / C / rejected backlog:
+
+- `docs/admin-backlog.md` — 20 items across three buckets:
+  - **Phase B** (15 items): editorial review workflow,
+    audit-log viewer, revision history viewer, hero-image
+    upload, bulk actions, markdown source mode, .docx import,
+    per-translation ready flag, image resize / Figure
+    captions, typography pack, video / audio embeds, tables,
+    full-body search, advanced list filters, staff
+    invitation flow.
+  - **Phase C** (5 items): 2FA, SSO, multi-stage review,
+    AI assists, collaborative editing.
+  - **Rejected** (8 items): WeChat decoration templates,
+    polls, comments, drag-to-reorder paragraphs, per-user
+    editor preferences, GraphQL admin API, custom spreadsheet
+    views, article forking.
+- Each Phase B/C item has scope, estimate, and an explicit
+  "trigger that should make us pick it up" so future-us
+  doesn't relitigate.
+- Closing rule: revisit this file after two weeks of real
+  editorial use, pick top three by actual friction.
+
+E2E test:
+
+- `apps/web/tests/e2e/admin-articles.spec.ts` — three Playwright
+  specs:
+  1. **Happy path**: sign in as demo-admin → create draft
+     with unique slug → change required tier → save metadata
+     → type in body editor + Cmd+S → add zh-CN translation
+     via picker → publish → drop tier back to free → sign
+     out → visit `/en/articles/<slug>` anonymously → confirm
+     title + body render. Cleans up the article on exit
+     (works around re-running by also cleaning on entry).
+  2. **Non-staff rejected**: sign in as `demo-free` → visit
+     `/admin` → assert redirected to `/dashboard`.
+  3. **Anonymous redirected**: visit `/admin` with no cookies
+     → assert redirected to `/sign-in?redirectTo=…`.
+- Uses the existing rate-limit reset endpoint and the
+  Playwright config (port 3030, AITO_E2E=1 marker).
+- E2E isn't part of `pnpm test` (vitest only); run with:
+  ```
+  pnpm db:up && pnpm db:seed
+  pnpm --filter @aito/web test:e2e
+  ```
+
+**Verifies**
+
+- `pnpm --filter @aito/web type-check` → clean
+- `pnpm --filter @aito/web test` → 95 passing (no new vitest
+  tests today; Playwright is a separate target)
+- `pnpm --filter @aito/web build` → green
+- Manual: ran the happy path E2E locally end-to-end against
+  the docker DB; all three specs green inside ~25 s wall-clock
+- `node -e "..."` i18n audit script confirms 0 missing keys
+  in zh-CN or zh-HK
+
+**Decisions**
+
+- **No batch i18n pass needed.** Translating each day's strings
+  inline (Day 1 was the call; consistently applied since)
+  paid off — by Day 9 the zh translations were already
+  complete. Logged the audit script in this file so we can
+  re-verify any time the en namespace grows.
+- **E2E happy path drops `requiredTier` before reading.** The
+  test's published article is `requiredTier: premium` for one
+  step, then drops to `free` before the anonymous reader visit
+  — otherwise we'd hit the paywall and the test would need
+  authenticated reader setup. Future paywall E2E will cover
+  the paywall path separately.
+- **E2E doesn't test image upload.** Vercel Blob isn't
+  reliable to mock in Playwright (the SDK does direct HTTP),
+  and adding a mock layer just for E2E adds drift risk. Image
+  upload is covered by the manual smoke in Day 7 and will be
+  E2E-tested once the upload route grows enough surface to
+  justify it (Phase B's bulk image manager probably).
+- **Runbook lives at `docs/`, not `apps/web/`.** The two other
+  runbooks (stripe-runbook, deployment-runbook) are at `docs/`;
+  consistency wins over locating it near the admin code.
+- **Backlog is exhaustive on purpose.** Better to capture
+  rejected ideas with a one-line reason than to relitigate
+  them in three months. Saves the "we should add comments"
+  conversation from happening twice.
+
+**Phase A — final scorecard**
+
+| Slice | Done | Notes |
+|---|---|---|
+| Identity & access | ✅ | staff helper + admin shell + dashboard |
+| Article list & discovery | ✅ | status tabs + search + pagination |
+| Edit experience — metadata | ✅ | 8-field form + audit |
+| Edit experience — translation tabs | ✅ | any-one required + copy-from |
+| Editor (TipTap) | ✅ | 21 toolbar buttons + autosave |
+| Paste sanitiser | ✅ | DOMPurify + 2-layer (paste + render) |
+| Image upload | ✅ | Vercel Blob + drag/paste/toolbar |
+| HTML source + word count + preview + Cmd+S | ✅ | Day 8 |
+| Editorial workflow | ✅ | 3-state machine + status actions |
+| Revisions & audit | ✅ data, ⏳ viewer | data via prisma middleware; UI Phase B |
+| Reader-side surfaces | ✅ | rewrote public article page to read DB |
+| Related entities | ⏳ Phase B+ | podcast / live / IM intentionally out |
+| zh-CN / zh-HK admin i18n | ✅ | 177 keys × 3 locales, no gaps |
+| E2E test | ✅ | Playwright happy path + 2 guard specs |
+| Editor runbook | ✅ | docs/admin-runbook.md |
+| Deferred backlog | ✅ | docs/admin-backlog.md |
+
+Total: **9 days, 1 branch (`feat/admin-articles`), 12
+commits, 95 vitest tests + 3 Playwright specs.**
+
+Branch is ready to PR into main. Pre-merge sanity:
+- `git push origin feat/admin-articles`
+- Open PR vs main
+- Quick local read of the diff (large but coherent per
+  commit)
+- Merge with `--no-ff` to preserve commit history (same
+  pattern as the stripe branch)
+- Vercel auto-deploys main → production picks up the new
+  admin and the rewritten public article page
+
+**Carry-over for production**
+
+- **Vercel Blob must be enabled.** Settings → Storage →
+  Create Database → Blob. Vercel injects
+  `BLOB_READ_WRITE_TOKEN` automatically. Without it Day 7's
+  image upload returns 502 from the put() call.
+- **Run the audit log seed once after deploy** if you want
+  demo-admin in prod: `DATABASE_URL=<prod> pnpm db:seed`
+  re-runs Day 1's user grant.
+- **`zh_HK` Locale enum migration must apply.** The
+  `prisma migrate deploy` baked into `vercel-build` (see
+  deployment-runbook.md) handles this automatically.
