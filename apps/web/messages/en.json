@@ -1038,6 +1038,70 @@
       "reviews": "Editorial review workflow is Phase B. For now editors hit Publish directly from a draft.",
       "users": "Read-only user explorer is Phase B. For now Prisma Studio is the source of truth.",
       "settings": "Settings UI is Phase B. For now PlatformSetting rows are edited via Prisma Studio."
+    },
+    "articles": {
+      "heading": "Articles",
+      "subheading": "All drafts, published pieces, and archived work. Click a row to edit.",
+      "newArticle": "New article",
+      "searchPlaceholder": "Search by title…",
+      "untitled": "(untitled)",
+      "updatedAt": "Updated",
+      "empty": "No articles yet. Start a new draft to see it here.",
+      "emptyWithSearch": "No articles match \"{q}\".",
+      "prev": "Previous",
+      "next": "Next",
+      "paginationCount": "{from}–{to} of {total}",
+      "tabs": {
+        "all": "All",
+        "draft": "Drafts",
+        "published": "Published",
+        "archived": "Archived",
+        "other": "Other"
+      },
+      "status": {
+        "draft": "draft",
+        "in_review": "in review",
+        "legal_review": "legal review",
+        "scheduled": "scheduled",
+        "published": "published",
+        "archived": "archived"
+      },
+      "new": {
+        "backToList": "Back to articles",
+        "heading": "New article",
+        "subheading": "Pick a kind, a starting language, and a working title. You can fine-tune everything else on the next screen.",
+        "kind": "Kind",
+        "kindOptions": {
+          "newsletter": "Newsletter",
+          "podcast": "Podcast",
+          "blog": "Blog post"
+        },
+        "locale": "Starting language",
+        "localeHelp": "You can add other languages from the editor. Public site falls back gracefully when a visitor's locale is missing.",
+        "title": "Working title",
+        "titleHelp": "Editable later. Used to suggest the URL slug below.",
+        "slug": "URL slug",
+        "slugHelp": "Lowercase letters, numbers, and dashes only. Becomes /articles/<slug>.",
+        "slugAutoNote": "(auto-suggested from title — click to edit)",
+        "submit": "Create draft",
+        "submitting": "Creating…",
+        "errors": {
+          "validation": "Please check the highlighted fields.",
+          "titleRequired": "Title is required.",
+          "slugInvalid": "Slug must be lowercase letters, numbers, and dashes.",
+          "slugTaken": "This slug is already in use. Pick another.",
+          "permissionDenied": "Your role doesn't include drafting articles. Ask an admin for the editor role.",
+          "notStaff": "You need to be signed in as staff to create articles.",
+          "internal": "Something went wrong on our end. Try again in a moment."
+        }
+      },
+      "edit": {
+        "backToList": "Back to articles",
+        "untitled": "(untitled)",
+        "comingSoon": "The metadata form, translation tabs, and rich-text editor land on Day 4. The draft exists in the database — you can publish it after that ships.",
+        "translation": "translation",
+        "translations": "translations"
+      }
     }
   }
 }

@@ -1038,6 +1038,70 @@
       "reviews": "编辑审核流程在 Phase B 实现。现阶段编辑直接从草稿点击发布。",
       "users": "用户只读视图在 Phase B 实现。现阶段以 Prisma Studio 为准。",
       "settings": "设置界面在 Phase B 实现。现阶段在 Prisma Studio 修改 PlatformSetting 行。"
+    },
+    "articles": {
+      "heading": "文章",
+      "subheading": "所有草稿、已发布与归档的稿件。点击条目进入编辑。",
+      "newArticle": "新建文章",
+      "searchPlaceholder": "按标题搜索…",
+      "untitled": "(无标题)",
+      "updatedAt": "更新于",
+      "empty": "暂无文章。从新建草稿开始。",
+      "emptyWithSearch": "没有标题包含 \"{q}\" 的文章。",
+      "prev": "上一页",
+      "next": "下一页",
+      "paginationCount": "{from}–{to} 条,共 {total} 条",
+      "tabs": {
+        "all": "全部",
+        "draft": "草稿",
+        "published": "已发布",
+        "archived": "已归档",
+        "other": "其他"
+      },
+      "status": {
+        "draft": "草稿",
+        "in_review": "审核中",
+        "legal_review": "法务审核",
+        "scheduled": "已排期",
+        "published": "已发布",
+        "archived": "已归档"
+      },
+      "new": {
+        "backToList": "返回文章列表",
+        "heading": "新建文章",
+        "subheading": "选择类型、起始语言与暂用标题。其余字段在下一页继续完善。",
+        "kind": "类型",
+        "kindOptions": {
+          "newsletter": "通讯",
+          "podcast": "播客",
+          "blog": "博客文章"
+        },
+        "locale": "起始语言",
+        "localeHelp": "可在编辑器内添加其他语言。读者站点会按访客语言优雅回退。",
+        "title": "暂用标题",
+        "titleHelp": "稍后可改,用于自动建议下方的 URL 字段。",
+        "slug": "URL 标识",
+        "slugHelp": "仅小写字母、数字与连字符。最终路径为 /articles/<slug>。",
+        "slugAutoNote": "(根据标题自动建议,可点击修改)",
+        "submit": "创建草稿",
+        "submitting": "创建中…",
+        "errors": {
+          "validation": "请检查高亮的字段。",
+          "titleRequired": "请填写标题。",
+          "slugInvalid": "标识只能包含小写字母、数字与连字符。",
+          "slugTaken": "该标识已被占用,请换一个。",
+          "permissionDenied": "你的角色不包含起草文章权限。请联系管理员。",
+          "notStaff": "需要使用编辑账户登录后才能新建文章。",
+          "internal": "服务端出错,请稍后重试。"
+        }
+      },
+      "edit": {
+        "backToList": "返回文章列表",
+        "untitled": "(无标题)",
+        "comingSoon": "元数据表单、多语言切换与富文本编辑器将在第 4 天上线。草稿已在数据库中,届时可继续完善并发布。",
+        "translation": "种语言",
+        "translations": "种语言"
+      }
     }
   }
 }

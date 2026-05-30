@@ -571,3 +571,188 @@ Closes: "What transitions are legal?"
   doesn't get touched today. Seed already creates articles in
   `published` state. Day 3's list page will be populated by
   those + any new drafts the editor creates.
+
+---
+
+### Day 3 — 2026-05-30 — Article list + create + audit helper
+
+Closes: "How do I make a draft and find it again?"
+
+**Shipped**
+
+Schema:
+
+- `packages/database/prisma/migrations/20260530024950_locale_add_zh_hk/`
+  — `ALTER TYPE locale ADD VALUE IF NOT EXISTS 'zh-HK'` (additive,
+  before `zh-TW`). Resolves a long-standing mismatch where the i18n
+  folder shipped a `zh-HK` namespace but the DB enum only had
+  `zh-TW`. No data migration needed — no rows currently use `zh_TW`
+  either.
+- `packages/database/prisma/schema.prisma` — added the `zh_HK`
+  enum value to match.
+
+New admin lib:
+
+- `apps/web/src/lib/admin/audit.ts` — `recordAuditLog()` modelled
+  on `lib/auth/audit.ts`. One table (`audit_log_entries`) carries
+  both auth events and admin actions so the future audit-viewer
+  is one query. `actorType` defaults to `admin`; IP / UA captured
+  from request headers; write is *not* try/catch'd (compliance
+  must not silently drop audit rows).
+- `apps/web/src/lib/admin/slug.ts` + `slug.test.ts` — `suggestSlug()`
+  helper. Strips CJK / punctuation / emoji, dash-joins, caps at
+  80 chars, falls back to `article-<6char>` for pure-non-Latin
+  titles. 8 unit tests covering ASCII, CJK, mixed, emoji, length
+  cap, fallback uniqueness.
+
+Server actions:
+
+- `apps/web/src/app/[locale]/admin/articles/_actions.ts` —
+  `createArticleAction()`. Flow:
+  1. `requirePermission("content.draft")` (catches StaffAuthError,
+     converts to a serialisable result code)
+  2. zod validate body (slug regex, kind enum, locale enum, title
+     min/max)
+  3. Auto-suggest slug if blank; pre-check slug uniqueness
+     (cheap pre-check before relying on the DB unique constraint
+     so the form gets a clean `fieldErrors.slug` instead of a
+     500)
+  4. `prisma.$transaction`: create Article (status=draft,
+     requiredTier=free as default the editor will refine on Day 4)
+     + one ArticleTranslation with empty `bodyMdx` and `excerpt`
+  5. `recordAuditLog({ action: "article.created", ... })`
+  6. `revalidatePath("/admin/articles")` so the new row shows
+     up on the next list render
+  7. Return `{ ok: true, articleId, slug }` to the client form
+
+  Returns a discriminated `CreateArticleResult` union with codes:
+  `validation` (field errors map), `slugTaken`, `permissionDenied`,
+  `notStaff`, `internal`. Client maps each to a localized message.
+
+Pages:
+
+- `apps/web/src/app/[locale]/admin/articles/page.tsx` — full list
+  replacing Day 1's placeholder. Five status tabs (all / draft /
+  published / archived / other), search box (client component
+  preserving the active tab), 25/page pagination preserving both
+  `?status=` and `?q=`. Concurrent Prisma queries: list + count +
+  groupBy(status) for tab badges. Display logic picks the title
+  in the viewer's locale, falls back to the first available
+  translation, falls back to "(untitled)". Empty state has a CTA
+  pointing at /admin/articles/new.
+- `apps/web/src/app/[locale]/admin/articles/new/page.tsx` +
+  `NewArticleForm.tsx` — server page guards via
+  `requirePermission("content.draft")` (redirects to
+  `/admin/articles?denied=1` on missing permission), client form
+  manages kind + locale + title + slug state. Slug auto-suggests
+  from title until the editor touches the slug field — then it's
+  fully editable. Errors map per-field. On success redirects to
+  the new article's edit page.
+- `apps/web/src/app/[locale]/admin/articles/[id]/edit/page.tsx` —
+  Day 3 placeholder. Shows title + status badge + slug + a
+  "coming soon Day 4" panel. Exists so the post-create redirect
+  has somewhere to land and the staff member sees the new row
+  is real.
+
+Components:
+
+- `apps/web/src/components/admin/ArticleStatusBadge.tsx` — color-
+  coded pill per status. Async server-component variant for use
+  in lists; sync client-component variant for use in editor pages
+  (Day 4+). Shares the same `TONE` map.
+- `apps/web/src/components/admin/ArticleSearchBox.tsx` — client
+  component with `useTransition` for non-blocking nav. Preserves
+  the active status filter when submitting.
+
+i18n:
+
+- All three locales got `admin.articles.*` blocks: heading,
+  subheading, search box copy, empty states, tabs, status labels,
+  pagination, the new-article form (with kind/locale/title/slug
+  helps and the full error code map), and the edit placeholder.
+  zh-CN + zh-HK translated by hand on Day 3 (same reasoning as
+  Day 1 — short strings, cheaper to do now than batch on Day 9).
+
+**Verifies**
+
+- `pnpm --filter @aito/web type-check` → clean
+- `pnpm --filter @aito/web test` → 71 pass (8 new from slug;
+  total includes existing 63)
+- `pnpm --filter @aito/web build` → 7 admin route variants
+  (dashboard + articles list + new + edit-dynamic + 3 placeholders)
+  × 3 locales = 21 page bundles + 1 dynamic edit. Expected
+  `prisma:error` lines during build (DB unreachable in CI).
+
+Manual smoke checklist (against local docker DB):
+
+1. Apply the new migration: `pnpm db:up && pnpm db:migrate`
+2. `pnpm web:dev`
+3. Sign in as `demo-admin@aito.io` / `DemoAdmin2026!`
+4. `/en/admin/articles` → renders the existing seeded articles
+   under the "Published" tab (seed currently writes them as
+   `published`)
+5. Click "New article" → fill in `newsletter` / `en` / "My first
+   draft" → leave slug blank → submit → lands on the placeholder
+   edit page; URL is `/admin/articles/<uuid>/edit`
+6. Back to /admin/articles → the new row appears under "Drafts"
+   tab with auto-generated slug `my-first-draft`
+7. Try creating another article with the same slug typed in
+   manually → form shows "This slug is already in use"
+8. Search "first" → list narrows to the new row
+9. `select * from audit_log_entries where action='article.created'`
+   → one row per create, `actor_id` matches demo-admin, `metadata`
+   has `source: createArticleAction`
+
+**Decisions**
+
+- **`zh_HK` enum migration shipped today, not deferred.** Editors
+  pick a starting language on /new; without `zh_HK` an editor
+  drafting in HK Cantonese would have to write it under `zh_TW`
+  and we'd carry the mismatch forever. Migration is additive
+  and zero-risk because no row currently uses `zh_TW` either.
+- **`bodyMdx` column stays named `bodyMdx` even though Day 5
+  writes HTML into it.** Renaming the column means a destructive
+  migration on a table that already has seeded content. Leave
+  the legacy name; add a comment in Day 5 explaining the body
+  contract is HTML now. If we ever do need MDX (embedded React
+  in articles), the column name still fits.
+- **Server action returns a result object, doesn't throw.** Throw
+  pattern would lose the user's typed input on the redirect to a
+  Next error boundary. Returning `{ ok: false, code, fieldErrors }`
+  lets the client display errors next to the offending fields
+  without resetting the form.
+- **Pre-check slug uniqueness instead of trying to catch P2002.**
+  We could rely on the DB unique constraint and translate P2002
+  into "slugTaken", but a pre-check produces cleaner field
+  errors and avoids the cost of a failed transaction. Race
+  condition: two staff members typing the same slug at the same
+  second; in that case the second call hits P2002 and currently
+  surfaces as `internal`. Acceptable for Phase A — editorial
+  teams are tiny enough that this is a theoretical bug.
+- **Created with `requiredTier=free` regardless of editor input.**
+  /new doesn't ask for tier; Day 4's edit page does. Default
+  matches the schema default. Free draft articles aren't
+  publicly visible until status flips to `published` anyway,
+  so the temporary "free" tier is invisible.
+- **`ArticleStatusBadge` ships in both async and sync variants.**
+  Day 3 uses async (server component list); Day 4's edit page
+  will be a server component too, but the publish/archive
+  buttons surrounding the badge will need client-side reactivity.
+  Easier to maintain two thin variants now than refactor later.
+- **Search filters titles only.** Body / slug / author search
+  would each need additional indexes; deferred to Phase B when
+  we know what editors actually need. Title-contains is enough
+  to find anything an editor remembers writing.
+- **"Other" tab folds Phase B states.** `in_review`,
+  `legal_review`, `scheduled` aren't reachable from Phase A's
+  UI but a Phase B feature toggled prematurely (or a manual
+  DB edit) could land an article there. The Other tab gives
+  visibility without polluting the main tabs.
+
+**Carry-over**
+
+- Day 4: replace the placeholder edit page with the real
+  metadata form + three-language translation tabs (any-one
+  required) + still-placeholder body field (Day 5 plugs in
+  TipTap). Build the `updateTranslationAction` server action
+  alongside.

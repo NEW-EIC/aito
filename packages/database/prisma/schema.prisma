@@ -292,6 +292,7 @@ enum ExternalProvider {
 enum Locale {
   en
   zh_CN @map("zh-CN")
+  zh_HK @map("zh-HK")
   zh_TW @map("zh-TW")
   ja
   ko
