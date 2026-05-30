@@ -1181,6 +1181,11 @@
             "saving": "Saving…",
             "failed": "Autosave failed. Click \"Save translation\" to retry."
           },
+          "copyFromLocale": {
+            "trigger": "Copy from…",
+            "heading": "Source language",
+            "overwriteConfirm": "Replace the current draft with the source language's text? Your unsaved changes will be lost."
+          },
           "picker": {
             "heading": "Language",
             "cancel": "Cancel",

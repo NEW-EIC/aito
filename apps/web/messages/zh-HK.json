@@ -1181,6 +1181,11 @@
             "saving": "保存中…",
             "failed": "自動保存失敗,請撳「保存翻譯」重試。"
           },
+          "copyFromLocale": {
+            "trigger": "由其他語言複製…",
+            "heading": "來源語言",
+            "overwriteConfirm": "確定用所選語言嘅文本取代當前草稿?未保存嘅修改會冇咗。"
+          },
           "picker": {
             "heading": "語言",
             "cancel": "取消",

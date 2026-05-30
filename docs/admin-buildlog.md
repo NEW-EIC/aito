@@ -1064,3 +1064,184 @@ Manual smoke (against local docker DB):
   smoothing + "Copy from another locale" button + font/spacing
   presets + first-line indent. Public article renderer also
   consumes the same sanitiser when rendering bodies.
+
+---
+
+### Day 6 — 2026-05-30 — DOMPurify + paste cleanup + locale copy + real public renderer
+
+Closes: "Does pasting from WeChat just work?" (and the unstated but
+necessary "Do published articles actually show up on the public site?")
+
+**Shipped**
+
+Sanitiser:
+
+- `apps/web/src/lib/admin/sanitize.ts` — `sanitizeHtml(html, opts?)`
+  built on `isomorphic-dompurify`. Allowlist matches the TipTap
+  extension set installed in Day 5 (p / h2 / h3 / blockquote /
+  pre / hr / ul / ol / li / strong / em / u / s / del / ins /
+  code / br / span / a / mark / img + figure/figcaption). Three
+  DOMPurify hooks:
+  - Strip inline `style` declarations down to a tiny allowlist
+    (`text-align`, `color`, `background-color`) and drop anything
+    with `url(…)` or `expression(…)` so WeChat / Word tracking
+    pixels can't sneak in. If nothing survives, drop the
+    attribute entirely.
+  - Validate `href` / `src` URL schemes — http(s) / mailto / tel /
+    relative / anchor allowed; `javascript:`, `data:` (except
+    `data:image/…` for Day 7 paste-image), `file:`, etc. rejected.
+  - On output, set `target="_blank"` + `rel="noopener noreferrer"`
+    on every external link.
+- `apps/web/src/lib/admin/sanitize.test.ts` — 14 unit tests across
+  three blocks: XSS defenses (script tag, inline handlers, JS
+  URLs, iframe/object/embed), WeChat/Word noise cleanup (style
+  attribute trimming, dropped url(), MS Office namespaced tags),
+  link hardening, happy-path preservation (every allowed tag
+  survives, allowImages:false strips media).
+- Element-not-defined fix: DOMPurify hook callbacks duck-type
+  on `tagName` instead of `instanceof Element`, since
+  isomorphic-dompurify's bundled JSDOM doesn't expose Element
+  globally when used server-side.
+
+TipTap integration:
+
+- `editor/Editor.tsx` `transformPastedHTML: (html) => sanitizeHtml(html)`.
+  Catches the editor's own paste pipeline — anything an editor
+  pastes from a webpage / WeChat / Word gets stripped before
+  ProseMirror parses it, so even ProseMirror's own permissive
+  paste handler never sees noxious markup. (Typed content is
+  already constrained by the schema, so it doesn't need a
+  sanitiser pass.)
+
+Public article renderer (the necessary corollary):
+
+- `apps/web/src/components/article/ArticleBody.tsx` — server
+  component that takes raw HTML, re-runs the sanitiser, then
+  renders with `dangerouslySetInnerHTML`. Defense-in-depth
+  even after the paste handler — covers DB rows that bypassed
+  the editor.
+- **Important fix:** the sanitise import is dynamic (`await import`).
+  isomorphic-dompurify lazily loads JSDOM on the first
+  `sanitize` call in Node, and Next 15's build-time
+  "collect-page-data" pass evaluates page modules — JSDOM
+  trips trying to read its bundled default-stylesheet.css
+  (which lives outside the .next bundle). Lazy import = JSDOM
+  only loads at request time. This is the second time this
+  exact JSDOM/Next bundling issue has caught us out (last
+  time was inside `lib/email`); pattern documented for future.
+- `apps/web/src/app/[locale]/articles/[slug]/page.tsx` —
+  rewritten from the i18n-mock to actually read the DB.
+  Pulls the article + translations + first author by slug.
+  Picks the visitor's locale's translation, falls back to
+  the first available, 404 if no translation exists.
+  Non-staff only see `published` rows; staff can append
+  `?preview=1` to see drafts / archived rows (Phase A
+  "preview before publish" without a separate route). Preview
+  banner renders above the body.
+
+Copy from another locale:
+
+- `TranslationTabs.tsx` extended: `TranslationEditor` now
+  accepts `otherTranslations` (everything except the active
+  tab's translation) and renders a `CopyFromLocaleMenu`
+  next to the SaveIndicator. Native `<details>` popover,
+  same `closeNearestDetails()` helper the editor toolbar
+  uses. Clicking a source locale fills the form fields with
+  that translation's values (title / subtitle / excerpt /
+  body / SEO). The form stays dirty until the editor clicks
+  Save — so the workflow is "stage translation, edit in
+  place, commit". `window.confirm` guards against
+  accidental overwrite when there are unsaved local changes.
+
+i18n: three new `admin.articles.edit.translations.copyFromLocale.*`
+keys per locale (trigger / heading / overwriteConfirm).
+
+**Verifies**
+
+- `pnpm --filter @aito/web type-check` → clean
+- `pnpm --filter @aito/web test` → 85 passing (14 new from
+  sanitiser; total was 71 → 85)
+- `pnpm --filter @aito/web build` → green after the lazy-import
+  fix. Edit route bundle 132 kB → 142 kB (sanitiser + DOMPurify
+  on the client side); public article route stayed small at
+  1.93 kB shell + 124 kB first-load.
+
+Manual smoke (against local docker DB):
+
+1. `pnpm web:dev`, sign in as `demo-admin@aito.io`
+2. Open the seed article's edit page → translations tab
+3. Paste a paragraph from a WeChat article into the body —
+   `font-family: PingFang SC; mso-style-…; color: …` all gone;
+   `<o:p>` wrappers gone but their text kept; bold / italic /
+   links preserved
+4. Add a new zh-HK translation → click "Copy from…" → pick the
+   en source → form fields populated, dirty badge on → tweak →
+   save → version bumps to 2
+5. Visit `/en/articles/yield-curve-uninverted` while signed in
+   as a regular user → seed article renders from DB (not the
+   old i18n mock); body html sanitised
+6. As demo-admin, add `?preview=1` to a draft article's URL →
+   draft body renders with the amber preview banner
+
+**Decisions**
+
+- **DOMPurify allowlist over denylist.** Anything not explicitly
+  listed is dropped. Adding a new TipTap extension means an entry
+  in `ALLOWED_TAGS` — visible in the diff, can't accidentally
+  leak. The shorter-term cost (forgetting to add a tag) is way
+  cheaper than the longer-term cost (a bypass-by-omission XSS).
+- **`style` attribute allowed but contents trimmed.** TipTap's
+  TextAlign extension emits `style="text-align: …"` and the
+  Color extension is the same shape for `color:`. Banning style
+  outright would break those features. The hook trims to the
+  three properties we actually want; everything else (font-*,
+  line-height when Word-imported, mso-*) gets dropped.
+- **No paste-image cleanup today.** TipTap currently swallows
+  pasted images as base64-encoded `<img src="data:…">` which
+  the allowlist permits as a data URL. Day 7 will rewrite the
+  paste handler to detect images, upload them to Vercel Blob,
+  and replace the data URL with the real URL — at which point
+  the allowlist can tighten and reject `data:` entirely.
+- **Two-layer sanitise (paste + render).** Belt and braces:
+  paste catches 99% of bad HTML before it ever lands in the DB,
+  render catches the 1% that didn't go through the editor
+  (manual DB edits, future API writes, mistaken migrations).
+  Both layers share the same allowlist so behavior is
+  consistent.
+- **Public article page now reads DB.** Previously it was a
+  hardcoded i18n mock and didn't even look at the slug. Day 6
+  had to rewrite it because the sanitiser is for rendering
+  published articles — without a real renderer, the whole
+  sanitise / publish flow is theatre. Editor's i18n mock is
+  gone; demo content comes from the seeded article rows.
+- **`?preview=1` for staff drafts.** Instead of a separate
+  `/admin/articles/[id]/preview` route, lean on the existing
+  public route + a query param + a staff check. Less duplication;
+  preview always exactly matches what readers will see (because
+  it's the same code path). Amber banner makes the mode obvious.
+- **`copyFromTranslation` copies everything, including SEO.**
+  Easier to "translate from a fresh blank canvas" than to
+  selectively copy. If the editor only wanted body, they could
+  clear the other fields after — but in practice they'll be
+  translating titles + SEO too.
+- **`window.confirm` for the overwrite gate.** Native confirm
+  is ugly but instant and a11y-good. Phase B can swap for a
+  proper Dialog primitive if editors complain.
+- **Lazy import of sanitise in ArticleBody.** Second time JSDOM
+  bites us at build time (first was email templates). Pattern:
+  any server-side module that transitively loads JSDOM must be
+  dynamically imported inside a function that only runs at
+  request time. Documenting here so future-me / future-you
+  remembers.
+
+**Carry-over**
+
+- Day 7: image upload — Vercel Blob credentials + TipTap Image
+  extension + drag-drop handler + paste-image handler (replaces
+  base64 with real URLs) + caption + alignment + max-width
+  clamp. Tighten sanitiser's allowlist to forbid `data:` URLs
+  once paste-image lands the real upload path.
+- Font-size / line-height presets + first-line indent: still
+  outstanding from Day 6's original brief. Rolled into Day 7
+  because they're tiny toolbar additions and pair with the
+  image work spec-wise.

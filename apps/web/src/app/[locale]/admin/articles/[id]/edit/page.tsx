@@ -256,6 +256,11 @@ export default async function EditArticlePage({
                 saving: tTabs("autosave.saving"),
                 failed: tTabs("autosave.failed"),
               },
+              copyFromLocale: {
+                trigger: tTabs("copyFromLocale.trigger"),
+                heading: tTabs("copyFromLocale.heading"),
+                overwriteConfirm: tTabs("copyFromLocale.overwriteConfirm"),
+              },
               errors: {
                 validation: tForm("errors.validation"),
                 titleRequired: tTabs("errors.titleRequired"),

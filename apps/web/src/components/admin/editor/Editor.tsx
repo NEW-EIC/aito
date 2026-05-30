@@ -9,6 +9,7 @@ import Highlight from "@tiptap/extension-highlight";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEffect, useRef } from "react";
 import { Toolbar } from "./Toolbar";
+import { sanitizeHtml } from "@/lib/admin/sanitize";
 
 interface Props {
   /** Initial HTML to load. Subsequent updates to this prop reset the editor
@@ -89,6 +90,13 @@ export function Editor({
         class:
           "tiptap-editor max-w-none focus:outline-none min-h-[28rem] px-4 py-3",
       },
+      // Sanitise pastes before ProseMirror parses them. TipTap calls this
+      // hook with the raw clipboard HTML (e.g. WeChat or Word output);
+      // we strip everything that's not in the allowlist before the
+      // schema gets a crack at it. Plain-text pastes go through
+      // `transformPastedText` (unused here — TipTap turns text into
+      // paragraphs natively, no sanitising needed for text).
+      transformPastedHTML: (html) => sanitizeHtml(html),
     },
   });
 

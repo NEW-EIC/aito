@@ -48,6 +48,11 @@ interface Labels {
   };
   toolbar: ToolbarLabels;
   autosave: { idle: string; saving: string; failed: string };
+  copyFromLocale: {
+    trigger: string;
+    heading: string;
+    overwriteConfirm: string;
+  };
   save: string;
   saving: string;
   saved: string;
@@ -189,6 +194,7 @@ export function TranslationTabs({
           key={active.locale /* reset state on tab change */}
           articleId={articleId}
           initial={active}
+          otherTranslations={translations.filter((t) => t.locale !== active.locale)}
           labels={labels}
           onSaved={(saved) => upsertTranslationInState(saved)}
         />
@@ -324,11 +330,13 @@ function AddTranslationPicker({
 function TranslationEditor({
   articleId,
   initial,
+  otherTranslations,
   labels,
   onSaved,
 }: {
   articleId: string;
   initial: ExistingTranslation;
+  otherTranslations: ExistingTranslation[];
   labels: Labels;
   onSaved: (saved: ExistingTranslation) => void;
 }) {
@@ -369,6 +377,22 @@ function TranslationEditor({
   }, [
     title, subtitle, excerpt, body, seoTitle, seoDescription, initial,
   ]);
+
+  /** Replace all field values with a copy of another translation. The
+   *  active editor stays in dirty state until the user clicks Save, so
+   *  this is "stage for translation" — pulling source text in for the
+   *  editor to translate, not committing a fresh row. SEO fields copy
+   *  too because if the editor is rewriting them anyway, having the
+   *  source nearby is helpful. */
+  function copyFromTranslation(source: ExistingTranslation, confirmFn: () => boolean) {
+    if (dirty && !confirmFn()) return;
+    setTitle(source.title);
+    setSubtitle(source.subtitle);
+    setExcerpt(source.excerpt);
+    setBody(source.body);
+    setSeoTitle(source.seoTitle);
+    setSeoDescription(source.seoDescription);
+  }
 
   // The shared save routine, used by both the explicit submit button and
   // the autosave debounce. Returns true on success so callers can decide
@@ -478,11 +502,27 @@ function TranslationEditor({
         <span>
           {labels.version} {initial.version}
         </span>
-        <SaveIndicator
-          dirty={dirty}
-          savedAt={savedAt}
-          labels={{ saved: labels.saved, unsaved: labels.unsaved }}
-        />
+        <div className="flex items-center gap-3">
+          {otherTranslations.length > 0 && (
+            <CopyFromLocaleMenu
+              sources={otherTranslations}
+              onCopy={(src) =>
+                copyFromTranslation(src, () =>
+                  window.confirm(labels.copyFromLocale.overwriteConfirm),
+                )
+              }
+              labels={{
+                trigger: labels.copyFromLocale.trigger,
+                heading: labels.copyFromLocale.heading,
+              }}
+            />
+          )}
+          <SaveIndicator
+            dirty={dirty}
+            savedAt={savedAt}
+            labels={{ saved: labels.saved, unsaved: labels.unsaved }}
+          />
+        </div>
       </div>
 
       {topError && (
@@ -606,4 +646,54 @@ function TranslationEditor({
       </div>
     </form>
   );
+}
+
+// ─── Copy from another locale ────────────────────────────────────────────
+
+function CopyFromLocaleMenu({
+  sources,
+  onCopy,
+  labels,
+}: {
+  sources: ExistingTranslation[];
+  onCopy: (source: ExistingTranslation) => void;
+  labels: { trigger: string; heading: string };
+}) {
+  return (
+    <details className="relative">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg-muted hover:text-fg">
+        {labels.trigger}
+      </summary>
+      <div className="absolute right-0 top-full z-20 mt-1 min-w-[12rem] rounded-md border border-border bg-surface p-2 shadow-lg">
+        <div className="px-2 pb-1 text-[10px] uppercase tracking-wider text-fg-soft">
+          {labels.heading}
+        </div>
+        <ul>
+          {sources.map((s) => (
+            <li key={s.locale}>
+              <button
+                type="button"
+                onClick={() => {
+                  onCopy(s);
+                  closeNearestDetails();
+                }}
+                className="block w-full rounded px-2 py-1.5 text-left text-sm text-fg hover:bg-bg-alt"
+              >
+                <span className="font-mono text-xs text-fg-soft">{s.locale}</span>{" "}
+                <span className="truncate">{s.title || "(untitled)"}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
+  );
+}
+
+/** Helper shared with the editor toolbar's popovers. */
+function closeNearestDetails() {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement)) return;
+  const details = active.closest("details");
+  if (details) details.removeAttribute("open");
 }
