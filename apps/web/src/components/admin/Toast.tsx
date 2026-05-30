@@ -10,6 +10,10 @@ export interface ToastMessage {
   tone: ToastTone;
   title: string;
   description?: string;
+  /** If true the toast won't auto-dismiss — caller is responsible for
+   *  calling dismiss(id) when its work is done. Used for "in-flight"
+   *  toasts (e.g. uploads) that should stay until completion. */
+  sticky?: boolean;
 }
 
 interface ToastViewProps {
@@ -45,11 +49,13 @@ function ToastCard({
   onDismiss: () => void;
 }) {
   // Auto-dismiss after 6s (errors stay longer than info / success).
+  // Sticky toasts wait for explicit dismiss(id) from the caller.
   useEffect(() => {
+    if (toast.sticky) return;
     const lifeMs = toast.tone === "error" ? 8000 : 5000;
     const id = setTimeout(onDismiss, lifeMs);
     return () => clearTimeout(id);
-  }, [onDismiss, toast.tone]);
+  }, [onDismiss, toast.tone, toast.sticky]);
 
   const Icon =
     toast.tone === "error" ? AlertCircle : toast.tone === "success" ? CheckCircle2 : AlertCircle;
@@ -92,12 +98,22 @@ function ToastCard({
 export function useToasts() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  const push = useCallback((tone: ToastTone, title: string, description?: string) => {
-    setToasts((prev) => [
-      ...prev,
-      { id: Date.now() + Math.floor(Math.random() * 1000), tone, title, description },
-    ]);
-  }, []);
+  const push = useCallback(
+    (
+      tone: ToastTone,
+      title: string,
+      description?: string,
+      opts?: { sticky?: boolean },
+    ) => {
+      const id = Date.now() + Math.floor(Math.random() * 1000);
+      setToasts((prev) => [
+        ...prev,
+        { id, tone, title, description, sticky: opts?.sticky },
+      ]);
+      return id;
+    },
+    [],
+  );
 
   const dismiss = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));

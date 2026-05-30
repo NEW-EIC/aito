@@ -52,10 +52,6 @@ export function Editor({
   // a blocking window.alert(). Scoped to this Editor instance.
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
 
-  // Insert an image at a position. Optimistically inserts a placeholder
-  // (a known data URL via the Image extension's allowBase64 path) so
-  // the editor sees something immediately, then swaps src after the
-  // real upload completes. On failure removes the placeholder.
   async function insertImageAtPosition(
     file: File,
     pos: number | null,
@@ -63,52 +59,29 @@ export function Editor({
     const ed = editorRef.current;
     if (!ed) return;
 
-    // 1×1 transparent placeholder. Cheap, parseable as a real image by
-    // the browser so the editor lays out a block.
-    const PLACEHOLDER =
-      "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
-    const marker = `pending-${crypto.randomUUID()}`;
-
-    const insertCmd = ed
-      .chain()
-      .focus()
-      .insertContentAt(pos ?? ed.state.selection.from, {
-        type: "image",
-        attrs: {
-          src: PLACEHOLDER,
-          alt: `Uploading ${file.name}…`,
-          title: marker, // we use this to find the node on success/failure
-        },
-      });
-    insertCmd.run();
+    // Simpler flow than the earlier optimistic-placeholder one: show a
+    // toast for the in-flight upload, await it, insert the real URL on
+    // success. Trades immediate "image lands" feedback for two things:
+    //   1. ResizableNodeView wraps each image — a 1×1 GIF placeholder
+    //      sized the wrapper to 1×1 px so editors saw nothing happen.
+    //   2. The previous flow inserted a data: URL into the doc; if
+    //      autosave fired during upload that data URL went to the DB,
+    //      and the public renderer's sanitiser strips data: URLs
+    //      → broken image on the public site until the next save.
+    // Synchronous insert with the real URL avoids both.
+    const uploadingToastId = pushToast(
+      "info",
+      "Uploading image…",
+      file.name,
+      { sticky: true },
+    );
 
     const result = await uploadImageFile(file);
 
-    // Find the node we inserted (it may have moved if the editor was
-    // typed into during upload). Walk the doc looking for our marker.
-    const findPos = (): number | null => {
-      let found: number | null = null;
-      ed.state.doc.descendants((node, p) => {
-        if (node.type.name === "image" && node.attrs.title === marker) {
-          found = p;
-          return false;
-        }
-        return true;
-      });
-      return found;
-    };
-
-    const targetPos = findPos();
-    if (targetPos === null) return; // node was deleted during upload
+    // Dismiss the in-flight toast either way.
+    dismissToast(uploadingToastId);
 
     if (!result.ok) {
-      // Remove the placeholder and surface the failure as a toast so
-      // editors see exactly what went wrong without losing focus on
-      // the editor.
-      ed.chain()
-        .focus()
-        .deleteRange({ from: targetPos, to: targetPos + 1 })
-        .run();
       const title = "Image upload failed";
       const description = `${result.code}${result.message ? `: ${result.message}` : ""}`;
       console.error("[editor]", title, description);
@@ -116,14 +89,16 @@ export function Editor({
       return;
     }
 
-    // Replace the placeholder node in-place with the real URL.
+    // Insert the real image at the requested position (or current
+    // selection if drop position is unknown / paste).
     ed.chain()
       .focus()
-      .setNodeSelection(targetPos)
-      .updateAttributes("image", {
-        src: result.url,
-        alt: file.name.replace(/\.[a-z0-9]+$/i, ""),
-        title: null,
+      .insertContentAt(pos ?? ed.state.selection.from, {
+        type: "image",
+        attrs: {
+          src: result.url,
+          alt: file.name.replace(/\.[a-z0-9]+$/i, ""),
+        },
       })
       .run();
   }
@@ -164,12 +139,6 @@ export function Editor({
       }),
       Image.configure({
         inline: false,
-        // We never want the raw HTML allowlist to permit a fresh `<img>`
-        // an editor might paste before upload finishes. ProseMirror's
-        // schema still permits `<img>` (we transform pasted data: URLs
-        // → real uploads in handlePaste below) but renders go through
-        // the sanitiser anyway as defense-in-depth.
-        allowBase64: true,
         HTMLAttributes: {
           class: "tiptap-image",
           loading: "lazy",

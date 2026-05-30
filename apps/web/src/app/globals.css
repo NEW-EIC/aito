@@ -246,11 +246,31 @@ html[lang^="zh"] body { line-height: 1.75; }
    equal-proportion scaling. */
 
 .tiptap-editor [data-resize-wrapper] {
-  /* The wrapper inherits the alignment from the parent paragraph; show
-     a soft outline when the image is selected so it's obvious the
-     handles are part of this element. */
+  /* `inline-block` so the wrapper sizes to the image (handles need
+     a sized parent) and so text-align on the containing paragraph
+     centers it. `position: relative` is required by TipTap's
+     positionHandle which places handles with absolute coords. The
+     surrounding paragraph gets the same `margin: 1em auto` the bare
+     `<img>` used to have — applied via the img rule above which still
+     reaches the inner image. */
   display: inline-block;
+  position: relative;
   max-width: 100%;
+  /* Ensure the wrapper itself has a non-zero footprint even if the
+     img is still loading — prevents the 1×1 collapse we had when
+     using a tiny placeholder. */
+  min-width: 64px;
+  min-height: 24px;
+}
+
+/* Inner image inside the wrapper: cancel the legacy `margin: 1em auto`
+   because the wrapper now provides the layout slot. Without this the
+   image gets pushed down by its own margin inside the wrapper. */
+.tiptap-editor [data-resize-wrapper] > img {
+  display: block;
+  margin: 0;
+  max-width: 100%;
+  height: auto;
 }
 
 .tiptap-editor [data-resize-wrapper]:hover,
