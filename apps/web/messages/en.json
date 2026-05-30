@@ -1098,9 +1098,85 @@
       "edit": {
         "backToList": "Back to articles",
         "untitled": "(untitled)",
-        "comingSoon": "The metadata form, translation tabs, and rich-text editor land on Day 4. The draft exists in the database — you can publish it after that ships.",
-        "translation": "translation",
-        "translations": "translations"
+        "metadataHeading": "Article metadata",
+        "metadataSub": "Slug, plan tier, category, authors, tags, and compliance settings. SEO overrides live per-translation below.",
+        "translationsHeading": "Translations",
+        "translationsSub": "At least one language is required. The public site falls back to whichever locale is filled when a visitor's preference is missing.",
+        "form": {
+          "slug": "URL slug",
+          "slugHelp": "Lowercase letters, numbers, and dashes only. Becomes /articles/<slug>.",
+          "kind": "Kind",
+          "kindOptions": {
+            "newsletter": "Newsletter",
+            "podcast": "Podcast",
+            "blog": "Blog post"
+          },
+          "requiredTier": "Required tier",
+          "requiredTierHelp": "Plan tier needed to read the full body. Drafts ignore this until published.",
+          "tierOptions": {
+            "free": "Free (public)",
+            "premium": "Premium",
+            "pro": "Pro Desk"
+          },
+          "complianceClass": "Compliance class",
+          "complianceHelp": "Flags how this article should be treated by the editorial review pipeline.",
+          "complianceOptions": {
+            "general_information": "General information",
+            "educational": "Educational",
+            "market_commentary": "Market commentary",
+            "specific_recommendation": "Specific recommendation (triggers legal review)"
+          },
+          "category": "Category",
+          "categoryNone": "(none)",
+          "authors": "Authors",
+          "authorsEmpty": "No author yet — add at least one before publishing.",
+          "tags": "Tags",
+          "tagsEmpty": "No tags yet.",
+          "heroImageUrl": "Hero image URL",
+          "heroImageHelp": "URL only for Phase A. Upload-from-disk arrives on Day 7.",
+          "save": "Save metadata",
+          "saving": "Saving…",
+          "saved": "Saved",
+          "unsaved": "Unsaved changes",
+          "errors": {
+            "validation": "Please check the highlighted fields.",
+            "slugRequired": "Slug is required.",
+            "slugInvalid": "Slug must be lowercase letters, numbers, and dashes.",
+            "slugTaken": "This slug is already in use.",
+            "notFound": "Article not found. Was it deleted in another tab?",
+            "permissionDenied": "Your role doesn't include editing articles.",
+            "notStaff": "You need to be signed in as staff to edit.",
+            "internal": "Something went wrong on our end. Try again in a moment."
+          }
+        },
+        "translations": {
+          "addTranslation": "Add translation",
+          "version": "Version",
+          "tiptapComingSoon": "Rich-text editor lands on Day 5. For now this is a plain textarea — HTML you paste here will render literally on the public site.",
+          "picker": {
+            "heading": "Language",
+            "cancel": "Cancel",
+            "titlePlaceholder": "Working title in this language",
+            "submit": "Add",
+            "submitting": "Adding…",
+            "allLocalesPresent": "All supported locales are already added."
+          },
+          "fields": {
+            "title": "Title",
+            "subtitle": "Subtitle",
+            "excerpt": "Excerpt",
+            "body": "Body",
+            "bodyPlaceholder": "Write the article body here.",
+            "seoTitle": "SEO title",
+            "seoTitleHelp": "Defaults to article title when blank.",
+            "seoDescription": "SEO description",
+            "seoDescriptionHelp": "Defaults to the excerpt when blank."
+          },
+          "errors": {
+            "titleRequired": "Title is required.",
+            "alreadyExists": "A translation in that language already exists."
+          }
+        }
       }
     }
   }

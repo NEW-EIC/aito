@@ -1098,9 +1098,85 @@
       "edit": {
         "backToList": "返回文章清單",
         "untitled": "(無標題)",
-        "comingSoon": "元資料表單、多語言切換同富文本編輯器會喺第 4 日上線。草稿已經喺資料庫,屆時可以繼續完善同發佈。",
-        "translation": "種語言",
-        "translations": "種語言"
+        "metadataHeading": "文章元資料",
+        "metadataSub": "URL 標識、付費檔位、分類、作者、標籤同合規分級。SEO 覆寫選項喺下面按翻譯分開設定。",
+        "translationsHeading": "多語言版本",
+        "translationsSub": "至少要一種語言。當訪客嘅語言版本缺失時,公眾站台會優雅回退去已有嘅語言。",
+        "form": {
+          "slug": "URL 標識",
+          "slugHelp": "只接受細寫字母、數字同連字符。最後路徑係 /articles/<slug>。",
+          "kind": "類型",
+          "kindOptions": {
+            "newsletter": "通訊",
+            "podcast": "播客",
+            "blog": "網誌文章"
+          },
+          "requiredTier": "所需檔位",
+          "requiredTierHelp": "閱讀全文所需嘅訂閱檔位。草稿喺發佈之前唔受此限制。",
+          "tierOptions": {
+            "free": "免費(公開)",
+            "premium": "Premium",
+            "pro": "Pro Desk"
+          },
+          "complianceClass": "合規分級",
+          "complianceHelp": "決定本篇喺編輯審核流程中嘅處理方式。",
+          "complianceOptions": {
+            "general_information": "一般資訊",
+            "educational": "教育內容",
+            "market_commentary": "市場評論",
+            "specific_recommendation": "具體投資建議(觸發法務審核)"
+          },
+          "category": "分類",
+          "categoryNone": "(無)",
+          "authors": "作者",
+          "authorsEmpty": "未有指定作者 — 發佈前至少加一位。",
+          "tags": "標籤",
+          "tagsEmpty": "未有標籤。",
+          "heroImageUrl": "封面圖 URL",
+          "heroImageHelp": "Phase A 只支援 URL。上傳圖片功能會喺第 7 日上線。",
+          "save": "保存元資料",
+          "saving": "保存中…",
+          "saved": "已保存",
+          "unsaved": "未保存",
+          "errors": {
+            "validation": "請檢查標紅嘅欄位。",
+            "slugRequired": "請填 URL 標識。",
+            "slugInvalid": "URL 標識只能用細寫字母、數字同連字符。",
+            "slugTaken": "呢個標識已經有人用。",
+            "notFound": "搵唔到呢篇文章,可能已經喺另一個分頁刪咗。",
+            "permissionDenied": "你嘅角色未包含編輯文章權限。",
+            "notStaff": "需要用編輯帳戶登入先可以修改。",
+            "internal": "伺服器出咗錯,請稍後再試。"
+          }
+        },
+        "translations": {
+          "addTranslation": "新增翻譯",
+          "version": "版本",
+          "tiptapComingSoon": "富文本編輯器會喺第 5 日上線。目前係純文本框 — 貼 HTML 會按字面喺公眾站台顯示。",
+          "picker": {
+            "heading": "語言",
+            "cancel": "取消",
+            "titlePlaceholder": "呢個語言嘅暫用標題",
+            "submit": "新增",
+            "submitting": "新增中…",
+            "allLocalesPresent": "已加齊所有支援嘅語言。"
+          },
+          "fields": {
+            "title": "標題",
+            "subtitle": "副標題",
+            "excerpt": "摘要",
+            "body": "正文",
+            "bodyPlaceholder": "喺度寫正文。",
+            "seoTitle": "SEO 標題",
+            "seoTitleHelp": "留空時預設用文章標題。",
+            "seoDescription": "SEO 描述",
+            "seoDescriptionHelp": "留空時預設用摘要。"
+          },
+          "errors": {
+            "titleRequired": "請填標題。",
+            "alreadyExists": "呢個語言已經有翻譯。"
+          }
+        }
       }
     }
   }

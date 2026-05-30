@@ -1098,9 +1098,85 @@
       "edit": {
         "backToList": "返回文章列表",
         "untitled": "(无标题)",
-        "comingSoon": "元数据表单、多语言切换与富文本编辑器将在第 4 天上线。草稿已在数据库中,届时可继续完善并发布。",
-        "translation": "种语言",
-        "translations": "种语言"
+        "metadataHeading": "文章元数据",
+        "metadataSub": "URL 标识、付费档位、分类、作者、标签与合规分级。SEO 覆盖项在下方按翻译单独设置。",
+        "translationsHeading": "多语言版本",
+        "translationsSub": "至少需要一种语言。当访客的语言版本缺失时,公众站点会优雅回退到已有的语言。",
+        "form": {
+          "slug": "URL 标识",
+          "slugHelp": "仅小写字母、数字与连字符。最终路径为 /articles/<slug>。",
+          "kind": "类型",
+          "kindOptions": {
+            "newsletter": "通讯",
+            "podcast": "播客",
+            "blog": "博客文章"
+          },
+          "requiredTier": "所需档位",
+          "requiredTierHelp": "阅读全文所需的订阅档位。草稿在发布之前不受此限制。",
+          "tierOptions": {
+            "free": "免费(公开)",
+            "premium": "Premium",
+            "pro": "Pro Desk"
+          },
+          "complianceClass": "合规分级",
+          "complianceHelp": "决定本篇在编辑审核流程中的处理方式。",
+          "complianceOptions": {
+            "general_information": "一般信息",
+            "educational": "教育内容",
+            "market_commentary": "市场评论",
+            "specific_recommendation": "具体投资建议(触发法务审核)"
+          },
+          "category": "分类",
+          "categoryNone": "(无)",
+          "authors": "作者",
+          "authorsEmpty": "尚未指定作者 — 发布前至少添加一位。",
+          "tags": "标签",
+          "tagsEmpty": "尚无标签。",
+          "heroImageUrl": "封面图 URL",
+          "heroImageHelp": "Phase A 仅支持 URL。上传图片功能将于第 7 天上线。",
+          "save": "保存元数据",
+          "saving": "保存中…",
+          "saved": "已保存",
+          "unsaved": "尚未保存",
+          "errors": {
+            "validation": "请检查高亮的字段。",
+            "slugRequired": "请填写 URL 标识。",
+            "slugInvalid": "URL 标识只能包含小写字母、数字与连字符。",
+            "slugTaken": "该标识已被占用。",
+            "notFound": "文章未找到,可能已在另一标签页被删除。",
+            "permissionDenied": "你的角色不包含编辑文章权限。",
+            "notStaff": "需要以编辑账户登录才能修改。",
+            "internal": "服务端出错,请稍后重试。"
+          }
+        },
+        "translations": {
+          "addTranslation": "添加翻译",
+          "version": "版本",
+          "tiptapComingSoon": "富文本编辑器将在第 5 天上线。当前为纯文本框 — 粘贴 HTML 会按字面在公众站点呈现。",
+          "picker": {
+            "heading": "语言",
+            "cancel": "取消",
+            "titlePlaceholder": "该语言的暂用标题",
+            "submit": "添加",
+            "submitting": "添加中…",
+            "allLocalesPresent": "已添加全部支持的语言。"
+          },
+          "fields": {
+            "title": "标题",
+            "subtitle": "副标题",
+            "excerpt": "摘要",
+            "body": "正文",
+            "bodyPlaceholder": "在此撰写正文。",
+            "seoTitle": "SEO 标题",
+            "seoTitleHelp": "留空时默认使用文章标题。",
+            "seoDescription": "SEO 描述",
+            "seoDescriptionHelp": "留空时默认使用摘要。"
+          },
+          "errors": {
+            "titleRequired": "请填写标题。",
+            "alreadyExists": "该语言已存在翻译。"
+          }
+        }
       }
     }
   }

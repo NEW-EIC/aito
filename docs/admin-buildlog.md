@@ -756,3 +756,160 @@ Manual smoke checklist (against local docker DB):
   required) + still-placeholder body field (Day 5 plugs in
   TipTap). Build the `updateTranslationAction` server action
   alongside.
+
+---
+
+### Day 4 — 2026-05-30 — Article shell: metadata form + translation tabs
+
+Closes: "How do I shape the article shell?"
+
+**Shipped**
+
+Server actions (added to `apps/web/src/app/[locale]/admin/articles/_actions.ts`):
+
+- `updateArticleMetadataAction` — guards on `content.draft`,
+  zod-validates the full metadata payload, runs the slug
+  uniqueness pre-check (and catches P2002 as a race-condition
+  fallback), then rewrites Article + ArticleAuthor join
+  (sortOrder = array index) + ArticleTag join inside one
+  Prisma transaction. Returns a discriminated result
+  (`validation` / `slugTaken` / `notFound` / `permissionDenied`
+  / `notStaff` / `internal`) and writes an audit row with
+  before/after snapshots.
+- `updateTranslationAction` — guards on `content.translate`,
+  validates, increments `currentVersion` atomically (relies on
+  the existing `ArticleTranslationRevision` middleware to
+  snapshot the old row). Returns `{ ok: true, savedAt }` so the
+  client can show "Saved at X" without a second round-trip.
+  Audit row carries old + new title/subtitle/excerpt + version
+  numbers.
+- `addTranslationAction` — for adding a locale that doesn't yet
+  exist on this article. Guards on `content.translate`,
+  validates locale + title, inserts an empty translation row
+  (subtitle/excerpt/body left blank), audits as
+  `article.translation.updated` with `action: "added"` metadata.
+
+New page:
+
+- `apps/web/src/app/[locale]/admin/articles/[id]/edit/page.tsx`
+  rewritten as a real server component. One `Promise.all` over
+  4 queries (article + categories + authors + tags) so the
+  child forms have everything they need without N+1. DB locale
+  → UI locale mapping handled at the page boundary so the
+  client components only know `"en" | "zh-CN" | "zh-HK"`.
+  Header shows the title in the viewer's preferred locale (or
+  first available), the status badge, and the slug.
+
+New client components:
+
+- `apps/web/src/components/admin/MetadataForm.tsx` — controlled
+  form with 8 fields (slug, kind, requiredTier, complianceClass,
+  categoryId, authorIds, tagIds, heroImageUrl). Dirty-check via
+  `JSON.stringify(current) !== JSON.stringify(initial)` — save
+  button is disabled when clean. Field-level errors mapped from
+  the server action's per-field error codes; top-level errors
+  for permission / not-found / internal.
+- `apps/web/src/components/admin/TranslationTabs.tsx` — three
+  sub-components:
+  - `TranslationTabs` (outer): tab bar across existing
+    translations + "Add translation" button when missing
+    locales exist. Maintains local state for the translation
+    set so newly-added rows appear without a round-trip.
+  - `AddTranslationPicker`: locale select + title input + 2
+    buttons. Maps `alreadyExists` to a clear error if two
+    editors race.
+  - `TranslationEditor`: per-tab form with title/subtitle/
+    excerpt + body textarea (Day 5 swaps for TipTap), and a
+    collapsible SEO section. Dirty-check, save indicator with
+    version number, server-action result handling.
+- `apps/web/src/components/admin/MultiSelect.tsx` — dependency-
+  free multi-select with chip display + search filter +
+  click-outside close. Phase A surface only — Phase B can swap
+  it for a Combobox with "create new" once we know the editorial
+  team actually wants in-form entity creation.
+- `apps/web/src/components/admin/SaveIndicator.tsx` — small
+  badge: amber "Unsaved changes" when dirty, green "Saved · Nm"
+  when clean (relative time auto-updates every minute).
+
+i18n: `admin.articles.edit` extended with `form.*` and
+`translations.*` sub-objects in all three locales — kind / tier /
+compliance / category / authors / tags / hero / save / errors
+for the metadata form, plus picker / fields / errors for the
+translation tabs. zh-CN + zh-HK done by hand today.
+
+**Verifies**
+
+- `pnpm --filter @aito/web type-check` → clean
+- `pnpm --filter @aito/web test` → 71 passing (no new tests
+  today — the slug helper already covered the Day 3 logic;
+  Day 4 server actions are integration-shaped and would need
+  Prisma mocking that's out-of-scope for Phase A)
+- `pnpm --filter @aito/web build` → green; edit route bundle
+  is 6.84 kB (up from 1.46 kB Day 3 placeholder — that's all of
+  the new component code in one route).
+
+Manual smoke (against local docker DB):
+
+1. Sign in as `demo-admin@aito.io`
+2. `/en/admin/articles` → click any existing article (seed
+   gives you the yield-curve one)
+3. Metadata panel: change `requiredTier` → premium, add an
+   author, click "Save metadata" → indicator goes green
+4. Translation tabs: switch to `en` tab (only one present from
+   seed) → tweak title → save → version number bumps to 2
+5. Click "Add translation" → pick `zh-HK` → fill working title
+   → submit → new tab appears, active, edit form ready
+6. Try saving with empty title → field error inline
+7. Two tabs open, edit slug in both, save sequentially → one
+   succeeds, the other gets the slugTaken field error
+
+**Decisions**
+
+- **Hero image stays as URL field for Phase A.** Form accepts
+  and audits the URL but the action doesn't persist it because
+  the DB column is `heroImageAssetId` (FK to MediaAsset). Day 7
+  wires up actual MediaAsset uploads via Vercel Blob and at
+  that point the URL field gets replaced. Form value is plumbed
+  through so the dirty-check still works correctly today.
+- **No autosave Day 4.** Autosave wants a stable event source
+  (TipTap fires `onUpdate` on every keystroke; textareas don't
+  have great equivalents without debouncing onChange). Easier
+  to add once Day 5 lands TipTap and we know what we're
+  debouncing.
+- **`updateArticleMetadataAction` audits under
+  `article.translation.updated`.** The audit action enum in
+  `lib/admin/audit.ts` doesn't yet have `article.metadata.updated`.
+  Reusing the closest key is a Day 9 cleanup task — by then
+  the full audit-action vocabulary will be settled and we can
+  add the missing one without churning the enum twice.
+- **Dirty-check via JSON.stringify.** Slow vs. structural
+  compare, but the payload is small (≤ 8 primitives + 2 short
+  arrays). Renders on every keystroke; profiled, no problem.
+  Plain `===` doesn't work for the authorIds / tagIds arrays
+  (reference would change on every state update).
+- **MultiSelect is dependency-free.** Considered React Aria,
+  but the Combobox primitive carries too much API surface for
+  what's effectively pick-from-list. ~80 lines wins.
+- **TranslationEditor uses `key={locale}` to reset state on tab
+  switch.** Otherwise switching from EN (edited) to zh-CN (edited)
+  to EN would carry over uncommitted local state and the dirty
+  badge would lie. React's `key` reconciliation handles this
+  cleanly without manual reset logic.
+- **Picker shows missing locales only.** If all three are
+  present the "Add translation" button hides — no UI for "add
+  ja or ko" because the schema enum supports them but the admin
+  UI doesn't model them yet. When Phase B opens up additional
+  locales (ja / ko / fr / zh-TW), `UI_LOCALES` widens.
+- **"Copy from another locale" deferred to Day 6.** Originally
+  promised for Day 4. Moved because it pairs naturally with
+  paste-sanitisation work — both need DOMPurify config; doing
+  them together avoids two reviews of the same rules.
+
+**Carry-over**
+
+- Day 5: install TipTap + extensions, replace the body
+  textarea with a real WYSIWYG editor. Toolbar covers bold /
+  italic / underline / strike / H2 / H3 / blockquote / divider
+  / lists / link / alignment / color / highlight. Autosave
+  with 2s debounce. Editor output is HTML, written into
+  `ArticleTranslation.bodyMdx` (legacy column name) verbatim.
